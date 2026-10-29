@@ -3,6 +3,7 @@ import asyncio
 import os
 import tempfile
 import time
+import base64
 import pandas as pd
 from supabase import create_client, Client
 import edge_tts
@@ -13,15 +14,6 @@ st.set_page_config(
     page_icon="🗣️",
     layout="wide"
 )
-
-# Hide the HTML5 audio player visual controls globally via CSS
-st.markdown("""
-    <style>
-    [data-testid="stAudio"] {
-        display: none;
-    }
-    </style>
-""", unsafe_allow_html=True)
 
 # --- SUPABASE CONNECTION ---
 @st.cache_resource
@@ -36,13 +28,13 @@ supabase: Client = init_supabase()
 
 # --- APP HEADER ---
 st.title("🗣️ Language Drill Studio")
-st.markdown("Listen Repeat Recall")
+st.markdown("Practice Listen Repeat Recall")
 
 if not supabase:
     st.error("⚠️ Supabase credentials missing! Please configure `SUPABASE_URL` and `SUPABASE_KEY` in Streamlit Secrets.")
     st.stop()
 
-# --- HELPER: AUDIO GENERATION ---
+# --- HELPER: AUDIO GENERATION & SILENT PLAYBACK ---
 async def generate_audio_async(text, voice, rate_str, output_path):
     communicate = edge_tts.Communicate(text, voice, rate=rate_str)
     await communicate.save(output_path)
@@ -65,6 +57,14 @@ def get_audio_bytes(text, voice="es-ES-AlvaroNeural", rate_str="+0%"):
     finally:
         if os.path.exists(tmp_path):
             os.remove(tmp_path)
+
+def play_audio_silently(audio_bytes):
+    """Injects base64 encoded audio into HTML to play automatically without any visible player UI."""
+    if not audio_bytes:
+        return
+    b64 = base64.b64encode(audio_bytes).decode()
+    audio_html = f'<audio autoplay="true" src="data:audio/mp3;base64,{b64}"></audio>'
+    st.markdown(audio_html, unsafe_allow_html=True)
 
 
 # --- TOP-LEVEL TABS ---
@@ -96,7 +96,7 @@ with tab_practice:
         with col_deck_sel:
             selected_deck = st.selectbox("Select Drill Deck:", deck_names, key="active_deck_select")
         with col_deck_del:
-            st.write("") # Alignment spacing
+            st.write("") 
             st.write("") 
             if st.button("🗑️ Delete Deck", type="secondary"):
                 if selected_deck:
@@ -193,10 +193,9 @@ with tab_practice:
             with col_p2:
                 stop_drill = st.button("⏹️ Stop Drill", type="secondary", use_container_width=True)
 
-            # Continuous Drill Execution Loop with unique keys
+            # Continuous Drill Execution Loop
             if start_drill:
                 drill_placeholder = st.empty()
-                audio_placeholder = st.empty()
                 
                 for idx, p in enumerate(phrases_data, 1):
                     target = p.get("spanish", "")
@@ -211,8 +210,8 @@ with tab_practice:
                     
                     if audio_bytes:
                         for rep in range(repetitions):
-                            audio_placeholder.audio(audio_bytes, format="audio/mp3", autoplay=True, key=f"drill_audio_{idx}_{rep}")
-                            time.sleep(1.2) # Est duration
+                            play_audio_silently(audio_bytes)
+                            time.sleep(2.0) # Wait for audio duration buffer
                             if pause_duration > 0 and rep < repetitions - 1:
                                 time.sleep(pause_duration)
                     
@@ -239,7 +238,7 @@ with tab_practice:
                     if st.button("▶ Play", key=f"play_single_{idx}"):
                         audio_data = get_audio_bytes(target, rate_str=selected_rate)
                         if audio_data:
-                            st.audio(audio_data, format="audio/mp3", autoplay=True, key=f"single_audio_{idx}")
+                            play_audio_silently(audio_data)
 
 
 # ==========================================
@@ -325,3 +324,4 @@ with tab_paste:
             
             st.success(f"Successfully saved deck '{deck_title}'! Refreshing...")
             st.rerun()
+            
