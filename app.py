@@ -2,6 +2,7 @@ import streamlit as st
 import asyncio
 import os
 import tempfile
+import time
 import pandas as pd
 from supabase import create_client, Client
 import edge_tts
@@ -32,7 +33,7 @@ if not supabase:
     st.error("⚠️ Supabase credentials missing! Please configure `SUPABASE_URL` and `SUPABASE_KEY` in Streamlit Secrets.")
     st.stop()
 
-# --- HELPER: AUDIO GENERATION WITH RATE CONTROL ---
+# --- HELPER: AUDIO GENERATION ---
 async def generate_audio_async(text, voice, rate_str, output_path):
     communicate = edge_tts.Communicate(text, voice, rate=rate_str)
     await communicate.save(output_path)
@@ -57,7 +58,7 @@ def get_audio_bytes(text, voice="es-ES-AlvaroNeural", rate_str="+0%"):
             os.remove(tmp_path)
 
 
-# --- TOP-LEVEL TABS (REPLACING THE SIDEBAR) ---
+# --- TOP-LEVEL TABS ---
 tab_practice, tab_upload, tab_paste = st.tabs([
     "📚 Practice Studio & Library",
     "📁 Upload CSV / TSV File",
@@ -71,6 +72,7 @@ tab_practice, tab_upload, tab_paste = st.tabs([
 with tab_practice:
     st.header("Listening Drill Studio")
     
+    # Reload deck list from Supabase
     try:
         decks_res = supabase.table("decks").select("name").execute()
         deck_names = [d["name"] for d in decks_res.data] if decks_res.data else []
@@ -81,9 +83,21 @@ with tab_practice:
     if not deck_names:
         st.info("No decks found in Supabase yet. Use the 'Upload CSV / TSV File' or 'Type / Paste Phrases' tabs above to add your first deck!")
     else:
-        # Step 1: Deck Selection
-        selected_deck = st.selectbox("Select Drill Deck:", deck_names)
-        
+        col_deck_sel, col_deck_del = st.columns([3, 1])
+        with col_deck_sel:
+            selected_deck = st.selectbox("Select Drill Deck:", deck_names, key="active_deck_select")
+        with col_deck_del:
+            st.write("") # Alignment spacing
+            st.write("") 
+            if st.button("🗑️ Delete Selected Deck", type="secondary"):
+                if selected_deck:
+                    try:
+                        supabase.table("decks").delete().eq("name", selected_deck).execute()
+                        st.success(f"Deleted deck '{selected_deck}'!")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Error deleting deck: {e}")
+
         if selected_deck:
             try:
                 phrases_res = supabase.table("phrases").select("*").eq("deck_name", selected_deck).execute()
@@ -95,7 +109,7 @@ with tab_practice:
             st.markdown(f"**Loaded Deck:** `{selected_deck}` ({len(phrases_data)} phrases available)")
             st.divider()
             
-            # Step 2: Inline Drill Controls & Settings
+            # Practice Settings
             st.subheader("⚙️ Practice Settings")
             c1, c2, c3, c4 = st.columns(4)
             
@@ -114,7 +128,7 @@ with tab_practice:
                 selected_rate = rate_mapping[speed_choice]
                 
             with c2:
-                repetitions = st.number_input("Repetitions per phrase", min_value=1, max_value=5, value=1)
+                repetitions = st.number_input("Repetitions per phrase", min_value=1, max_value=5, value=2)
                 
             with c3:
                 pause_duration = st.slider("Pause between phrases (s)", 0.0, 5.0, 1.5, 0.5)
@@ -124,26 +138,51 @@ with tab_practice:
             
             st.divider()
             
-            # Step 3: Audio Cache & Phrase List
-            col_action1, col_action2 = st.columns([2, 2])
-            with col_action1:
-                if st.button("🔄 Prepare / Rebuild Audio Chunks", type="secondary"):
-                    with st.spinner("Generating audio chunks via edge-tts..."):
-                        for item in phrases_data:
-                            spanish_text = item.get("spanish")
-                            if spanish_text:
-                                audio_bytes = get_audio_bytes(spanish_text, rate_str=selected_rate)
-                                if audio_bytes and supabase:
-                                    try:
-                                        file_path = f"{selected_deck}/{hash(spanish_text)}.mp3"
-                                        supabase.storage.from_("audio-cache").upload(
-                                            file_path, audio_bytes, file_options={"upsert": "true"}
-                                        )
-                                    except Exception:
-                                        pass
-                        st.success("Audio chunks successfully prepared and cached!")
+            # Global Drill Controls
+            st.subheader("🎧 Global Drill Player")
             
-            st.subheader("Phrase List & Audio Player")
+            col_p1, col_p2 = st.columns([2, 2])
+            with col_p1:
+                start_drill = st.button("▶️ Start Full Sequential Drill", type="primary", use_container_width=True)
+            with col_p2:
+                stop_drill = st.button("⏹️ Stop Drill", type="secondary", use_container_width=True)
+
+            # Continuous Drill Execution Loop
+            if start_drill:
+                drill_placeholder = st.empty()
+                audio_placeholder = st.empty()
+                
+                for idx, p in enumerate(phrases_data, 1):
+                    target = p.get("spanish", "")
+                    translation = p.get("english", "")
+                    
+                    # Highlight active phrase in UI
+                    display_text = f"### 🔊 Playing [{idx}/{len(phrases_data)}]: **{target}**"
+                    if show_translation:
+                        display_text += f"\n*Translation: {translation}*"
+                    drill_placeholder.markdown(display_text)
+                    
+                    # Fetch audio for target phrase
+                    audio_bytes = get_audio_bytes(target, rate_str=selected_rate)
+                    
+                    # Repeat $N$ times with configured pauses
+                    if audio_bytes:
+                        for rep in range(repetitions):
+                            audio_placeholder.audio(audio_bytes, format="audio/mp3", autoplay=True)
+                            time.sleep(1.2) # Wait for audio playback duration estimate
+                            if pause_duration > 0 and rep < repetitions - 1:
+                                time.sleep(pause_duration)
+                    
+                    # Pause between distinct phrases
+                    if pause_duration > 0:
+                        time.sleep(pause_duration)
+                
+                drill_placeholder.success("🎉 Drill completed!")
+
+            st.divider()
+            
+            # Phrase List Preview
+            st.subheader("Phrase List")
             for idx, p in enumerate(phrases_data, 1):
                 target = p.get("spanish", "")
                 translation = p.get("english", "")
@@ -155,7 +194,7 @@ with tab_practice:
                     else:
                         st.markdown(f"**{idx}.** {target}")
                 with row_cols[1]:
-                    if st.button("▶ Play", key=f"play_{idx}"):
+                    if st.button("▶ Play", key=f"play_single_{idx}"):
                         audio_data = get_audio_bytes(target, rate_str=selected_rate)
                         if audio_data:
                             st.audio(audio_data, format="audio/mp3", autoplay=True)
@@ -166,9 +205,7 @@ with tab_practice:
 # ==========================================
 with tab_upload:
     st.header("Upload Bilingual Phrase File")
-    st.markdown("Upload a CSV or TSV file containing your phrase pairs (expected columns: `spanish`, `english`).")
-    
-    uploaded_file = st.file_uploader("Choose a file", type=["csv", "tsv", "txt"])
+    uploaded_file = st.file_uploader("Choose a CSV or TSV file", type=["csv", "tsv", "txt"])
     deck_title_input = st.text_input("New Deck Name:", value="Imported Deck")
     
     if uploaded_file is not None:
@@ -183,29 +220,25 @@ with tab_upload:
             
             if st.button("Save Deck to Supabase", type="primary"):
                 with st.spinner("Saving deck to Supabase..."):
-                    try:
-                        supabase.table("decks").upsert({"name": deck_title_input}).execute()
-                    except Exception as e:
-                        st.warning(f"Deck upsert notice: {e}")
+                    supabase.table("decks").upsert({"name": deck_title_input}).execute()
                     
-                    success_count = 0
                     cols = {c.lower(): c for c in df.columns}
                     col_es = cols.get('spanish', df.columns[0] if len(df.columns) > 0 else None)
                     col_en = cols.get('english', df.columns[1] if len(df.columns) > 1 else col_es)
                     
+                    success_count = 0
                     for _, row in df.iterrows():
                         spanish_val = str(row[col_es]) if col_es else ""
                         english_val = str(row[col_en]) if col_en else ""
-                        try:
-                            supabase.table("phrases").insert({
-                                "deck_name": deck_title_input,
-                                "spanish": spanish_val,
-                                "english": english_val
-                            }).execute()
-                            success_count += 1
-                        except Exception:
-                            pass
-                    st.success(f"Successfully saved deck '{deck_title_input}' with {success_count} phrases to Supabase!")
+                        supabase.table("phrases").insert({
+                            "deck_name": deck_title_input,
+                            "spanish": spanish_val,
+                            "english": english_val
+                        }).execute()
+                        success_count += 1
+                    
+                    st.success(f"Successfully saved deck '{deck_title_input}' with {success_count} phrases!")
+                    st.rerun()
         except Exception as e:
             st.error(f"Error parsing file: {e}")
 
@@ -215,10 +248,8 @@ with tab_upload:
 # ==========================================
 with tab_paste:
     st.header("Type or Paste Bilingual Phrases")
-    st.markdown("Enter phrase pairs line by line separated by a pipe `|`, comma `,`, or tab.")
-    
     raw_text = st.text_area(
-        "Phrase pairs:",
+        "Phrase pairs (format: Spanish | English):",
         placeholder="Hola | Hello\n¿Cómo estás? | How are you?\nBuenos días | Good morning",
         height=150
     )
@@ -232,7 +263,8 @@ with tab_paste:
         else:
             sep = "|" if "|" in separator_choice else ("," if "," in separator_choice else "\t")
             lines = [line.strip() for line in raw_text.split("\n") if line.strip()]
-            processed_phrases = []
+            
+            supabase.table("decks").upsert({"name": deck_title}).execute()
             
             for line in lines:
                 if sep in line:
@@ -243,23 +275,11 @@ with tab_paste:
                     spanish_text = line
                     english_text = line
                 
-                processed_phrases.append({
+                supabase.table("phrases").insert({
+                    "deck_name": deck_title,
                     "spanish": spanish_text,
                     "english": english_text
-                })
+                }).execute()
             
-            try:
-                supabase.table("decks").upsert({"name": deck_title}).execute()
-                for p in processed_phrases:
-                    supabase.table("phrases").insert({
-                        "deck_name": deck_title,
-                        "spanish": p["spanish"],
-                        "english": p["english"]
-                    }).execute()
-                st.success(f"Successfully saved deck '{deck_title}' with {len(processed_phrases)} phrases to Supabase!")
-            except Exception as e:
-                st.warning(f"Processed successfully, but Supabase storage notice: {e}")
-            
-            st.subheader("Phrase Preview")
-            for idx, p in enumerate(processed_phrases, 1):
-                st.markdown(f"**{idx}.** {p['spanish']} &nbsp;|&nbsp; *{p['english']}*")
+            st.success(f"Successfully saved deck '{deck_title}'! Refreshing...")
+            st.rerun()
