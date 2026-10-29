@@ -36,7 +36,7 @@ supabase: Client = init_supabase()
 
 # --- APP HEADER ---
 st.title("🗣️ Language Drill Studio")
-st.markdown("Practice and build listening drills with persistent Supabase storage and natural text-to-speech.")
+st.markdown("Listen Repeat Recall")
 
 if not supabase:
     st.error("⚠️ Supabase credentials missing! Please configure `SUPABASE_URL` and `SUPABASE_KEY` in Streamlit Secrets.")
