@@ -14,6 +14,15 @@ st.set_page_config(
     layout="wide"
 )
 
+# Hide the HTML5 audio player visual controls globally via CSS
+st.markdown("""
+    <style>
+    [data-testid="stAudio"] {
+        display: none;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
 # --- SUPABASE CONNECTION ---
 @st.cache_resource
 def init_supabase():
@@ -89,7 +98,7 @@ with tab_practice:
         with col_deck_del:
             st.write("") # Alignment spacing
             st.write("") 
-            if st.button("🗑️ Delete Selected Deck", type="secondary"):
+            if st.button("🗑️ Delete Deck", type="secondary"):
                 if selected_deck:
                     try:
                         supabase.table("decks").delete().eq("name", selected_deck).execute()
@@ -107,6 +116,43 @@ with tab_practice:
                 st.error(f"Error loading phrases for deck '{selected_deck}': {e}")
             
             st.markdown(f"**Loaded Deck:** `{selected_deck}` ({len(phrases_data)} phrases available)")
+            
+            # --- EDIT DECK & PHRASES EXPANDER ---
+            with st.expander("✏️ Edit Deck Name & Phrases"):
+                new_deck_name = st.text_input("Rename Deck", value=selected_deck, key="rename_deck_input")
+                if st.button("Update Deck Name"):
+                    if new_deck_name and new_deck_name != selected_deck:
+                        try:
+                            supabase.table("decks").update({"name": new_deck_name}).eq("name", selected_deck).execute()
+                            supabase.table("phrases").update({"deck_name": new_deck_name}).eq("deck_name", selected_deck).execute()
+                            st.success("Deck renamed successfully!")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Error renaming deck: {e}")
+                
+                st.markdown("### Modify Phrases")
+                df_phrases = pd.DataFrame(phrases_data)
+                if not df_phrases.empty:
+                    editable_df = df_phrases[['spanish', 'english']] if 'spanish' in df_phrases.columns else df_phrases
+                    edited_df = st.data_editor(editable_df, num_rows="dynamic", key=f"editor_{selected_deck}")
+                    
+                    if st.button("Save Phrase Changes", type="primary"):
+                        try:
+                            supabase.table("phrases").delete().eq("deck_name", selected_deck).execute()
+                            for _, row in edited_df.iterrows():
+                                es = str(row.get("spanish", "")).strip()
+                                en = str(row.get("english", "")).strip()
+                                if es:
+                                    supabase.table("phrases").insert({
+                                        "deck_name": selected_deck,
+                                        "spanish": es,
+                                        "english": en
+                                    }).execute()
+                            st.success("Phrases updated successfully!")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Error updating phrases: {e}")
+
             st.divider()
             
             # Practice Settings
@@ -128,7 +174,7 @@ with tab_practice:
                 selected_rate = rate_mapping[speed_choice]
                 
             with c2:
-                repetitions = st.number_input("Repetitions per phrase", min_value=1, max_value=5, value=2)
+                repetitions = st.number_input("Repetitions per phrase", min_value=1, max_value=5, value=1)
                 
             with c3:
                 pause_duration = st.slider("Pause between phrases (s)", 0.0, 5.0, 1.5, 0.5)
@@ -147,7 +193,7 @@ with tab_practice:
             with col_p2:
                 stop_drill = st.button("⏹️ Stop Drill", type="secondary", use_container_width=True)
 
-            # Continuous Drill Execution Loop
+            # Continuous Drill Execution Loop with unique keys
             if start_drill:
                 drill_placeholder = st.empty()
                 audio_placeholder = st.empty()
@@ -156,24 +202,20 @@ with tab_practice:
                     target = p.get("spanish", "")
                     translation = p.get("english", "")
                     
-                    # Highlight active phrase in UI
                     display_text = f"### 🔊 Playing [{idx}/{len(phrases_data)}]: **{target}**"
                     if show_translation:
                         display_text += f"\n*Translation: {translation}*"
                     drill_placeholder.markdown(display_text)
                     
-                    # Fetch audio for target phrase
                     audio_bytes = get_audio_bytes(target, rate_str=selected_rate)
                     
-                    # Repeat $N$ times with configured pauses
                     if audio_bytes:
                         for rep in range(repetitions):
-                            audio_placeholder.audio(audio_bytes, format="audio/mp3", autoplay=True)
-                            time.sleep(1.2) # Wait for audio playback duration estimate
+                            audio_placeholder.audio(audio_bytes, format="audio/mp3", autoplay=True, key=f"drill_audio_{idx}_{rep}")
+                            time.sleep(1.2) # Est duration
                             if pause_duration > 0 and rep < repetitions - 1:
                                 time.sleep(pause_duration)
                     
-                    # Pause between distinct phrases
                     if pause_duration > 0:
                         time.sleep(pause_duration)
                 
@@ -197,7 +239,7 @@ with tab_practice:
                     if st.button("▶ Play", key=f"play_single_{idx}"):
                         audio_data = get_audio_bytes(target, rate_str=selected_rate)
                         if audio_data:
-                            st.audio(audio_data, format="audio/mp3", autoplay=True)
+                            st.audio(audio_data, format="audio/mp3", autoplay=True, key=f"single_audio_{idx}")
 
 
 # ==========================================
