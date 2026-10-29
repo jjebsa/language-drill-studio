@@ -1,0 +1,6 @@
+streamlit
+supabase
+edge-tts
+deep-translator
+pandas
+pydub
