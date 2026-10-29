@@ -4,7 +4,6 @@ import os
 import tempfile
 import pandas as pd
 from supabase import create_client, Client
-from deep_translator import GoogleTranslator
 import edge_tts
 
 # --- PAGE CONFIG ---
@@ -37,7 +36,7 @@ if not supabase:
 st.sidebar.header("Navigation")
 nav_choice = st.sidebar.radio(
     "Select Mode:",
-    ["📚 Phrase Library", "📁 Upload CSV File", "✍️ Type / Paste Phrases"]
+    ["📚 Phrase Library", "📁 Upload CSV / TSV File", "✍️ Type / Paste Bilingual Phrases"]
 )
 
 # --- HELPER: AUDIO GENERATION ---
@@ -77,7 +76,7 @@ if nav_choice == "📚 Phrase Library":
         st.sidebar.warning(f"Could not load decks from Supabase: {e}")
 
     if not deck_names:
-        st.info("No decks found in Supabase yet. Use 'Upload CSV File' or 'Type / Paste Phrases' to add your first deck!")
+        st.info("No decks found in Supabase yet. Use 'Upload CSV / TSV File' or 'Type / Paste Bilingual Phrases' to add your first deck!")
     else:
         selected_deck = st.selectbox("Select Deck", deck_names)
         if selected_deck:
@@ -93,7 +92,7 @@ if nav_choice == "📚 Phrase Library":
             if st.button("Prepare / Rebuild Audio Chunks"):
                 with st.spinner("Generating audio chunks via edge-tts..."):
                     for item in phrases_data:
-                        spanish_text = item.get("spanish") or item.get("target_text")
+                        spanish_text = item.get("spanish")
                         if spanish_text:
                             audio_bytes = get_audio_bytes(spanish_text)
                             if audio_bytes and supabase:
@@ -107,8 +106,8 @@ if nav_choice == "📚 Phrase Library":
                     st.success("Audio chunks successfully prepared and cached!")
             
             for idx, p in enumerate(phrases_data, 1):
-                target = p.get("spanish") or p.get("target_text", "")
-                translation = p.get("english") or p.get("translation_text", "")
+                target = p.get("spanish", "")
+                translation = p.get("english", "")
                 col_a, col_b = st.columns([3, 1])
                 with col_a:
                     st.markdown(f"**{idx}.** {target} *(Translation: {translation})*")
@@ -119,15 +118,20 @@ if nav_choice == "📚 Phrase Library":
                             st.audio(audio_data, format="audio/mp3")
 
 
-# --- MODE 2: UPLOAD CSV FILE ---
-elif nav_choice == "📁 Upload CSV File":
-    st.header("Upload New Phrase CSV")
-    uploaded_file = st.file_uploader("Choose a CSV file", type="csv")
-    deck_title_input = st.text_input("Deck Name for CSV:", value="Uploaded Deck")
+# --- MODE 2: UPLOAD CSV / TSV FILE ---
+elif nav_choice == "📁 Upload CSV / TSV File":
+    st.header("Upload Bilingual Phrase File")
+    uploaded_file = st.file_uploader("Choose a CSV or TSV file (Columns: spanish, english)", type=["csv", "tsv", "txt"])
+    deck_title_input = st.text_input("Deck Name:", value="My Imported Deck")
     
     if uploaded_file is not None:
         try:
-            df = pd.read_csv(uploaded_file)
+            # Auto-detect separator based on file extension
+            if uploaded_file.name.endswith('.tsv') or uploaded_file.name.endswith('.txt'):
+                df = pd.read_csv(uploaded_file, sep='\t')
+            else:
+                df = pd.read_csv(uploaded_file)
+                
             st.write("File uploaded successfully! Preview (first 5 rows):")
             st.dataframe(df.head())
             
@@ -135,69 +139,67 @@ elif nav_choice == "📁 Upload CSV File":
                 with st.spinner("Saving deck to Supabase..."):
                     try:
                         supabase.table("decks").upsert({"name": deck_title_input}).execute()
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        st.warning(f"Deck upsert notice: {e}")
                     
                     success_count = 0
+                    # Expecting columns like 'spanish' and 'english' (case-insensitive search)
+                    cols = {c.lower(): c for c in df.columns}
+                    col_es = cols.get('spanish', df.columns[0] if len(df.columns) > 0 else None)
+                    col_en = cols.get('english', df.columns[1] if len(df.columns) > 1 else col_es)
+                    
                     for _, row in df.iterrows():
-                        target_val = str(row.iloc[0]) if len(row) > 0 else ""
-                        trans_val = str(row.iloc[1]) if len(row) > 1 else target_val
+                        spanish_val = str(row[col_es]) if col_es else ""
+                        english_val = str(row[col_en]) if col_en else ""
                         try:
                             supabase.table("phrases").insert({
                                 "deck_name": deck_title_input,
-                                "spanish": target_val,
-                                "english": trans_val
+                                "spanish": spanish_val,
+                                "english": english_val
                             }).execute()
                             success_count += 1
                         except Exception:
                             pass
                     st.success(f"Successfully saved deck '{deck_title_input}' with {success_count} phrases to Supabase!")
         except Exception as e:
-            st.error(f"Error parsing CSV file: {e}")
+            st.error(f"Error parsing file: {e}")
 
 
-# --- MODE 3: TYPE / PASTE PHRASES ---
-elif nav_choice == "✍️ Type / Paste Phrases":
-    st.header("Type or Paste Phrases")
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        input_lang = st.selectbox("Input Language", ["English", "Spanish", "French", "Italian", "German"])
-    with col2:
-        target_lang = st.selectbox("Target Drill Language", ["Spanish (es-ES)", "English (en-US)"])
+# --- MODE 3: TYPE / PASTE BILINGUAL PHRASES ---
+elif nav_choice == "✍️ Type / Paste Bilingual Phrases":
+    st.header("Type or Paste Bilingual Phrases")
+    st.markdown("Enter phrases with Spanish and English separated by a tab or comma (e.g. `Hola,Hello` or `Buenos días	Good morning`).")
     
     raw_text = st.text_area(
-        "Enter phrases (one per line):",
-        placeholder="Hello\nHow are you?\nGood morning",
+        "Enter phrases (format: Spanish | English per line):",
+        placeholder="Hola | Hello\n¿Cómo estás? | How are you?\nBuenos días | Good morning",
         height=150
     )
     
     deck_title = st.text_input("New Deck Title:", value="My Custom Deck")
+    separator_choice = st.selectbox("Delimiter separator used:", ["| (Pipe)", ", (Comma)", "\\t (Tab)"])
     
-    if st.button("Process & Add Phrases", type="primary"):
+    if st.button("Process & Save Deck", type="primary"):
         if not raw_text.strip():
-            st.warning("Please enter at least one phrase.")
+            st.warning("Please enter at least one phrase pair.")
         else:
+            sep = "|" if "|" in separator_choice else ("," if "," in separator_choice else "\t")
             lines = [line.strip() for line in raw_text.split("\n") if line.strip()]
             processed_phrases = []
             
-            with st.spinner("Processing and translating phrases (batch mode)..."):
-                translated_lines = lines
-                if input_lang == "English" and "Spanish" in target_lang:
-                    try:
-                        translator = GoogleTranslator(source='en', target='es')
-                        translated_lines = translator.translate_batch(lines)
-                    except Exception as e:
-                        st.warning(f"Batch translation warning: {e}. Using raw text.")
-                        translated_lines = lines
-
-                for orig, trans in zip(lines, translated_lines):
-                    spanish_text = trans if "Spanish" in target_lang else orig
-                    english_text = orig if input_lang == "English" else trans
-                    processed_phrases.append({
-                        "spanish": spanish_text,
-                        "english": english_text
-                    })
+            for line in lines:
+                if sep in line:
+                    parts = line.split(sep, 1)
+                    spanish_text = parts[0].strip()
+                    english_text = parts[1].strip()
+                else:
+                    spanish_text = line
+                    english_text = line
+                
+                processed_phrases.append({
+                    "spanish": spanish_text,
+                    "english": english_text
+                })
             
             try:
                 supabase.table("decks").upsert({"name": deck_title}).execute()
@@ -213,4 +215,4 @@ elif nav_choice == "✍️ Type / Paste Phrases":
             
             st.subheader("Phrase Preview")
             for idx, p in enumerate(processed_phrases, 1):
-                st.markdown(f"**{idx}. Target:** {p['spanish']} | **Translation:** {p['english']}")
+                st.markdown(f"**{idx}. Spanish:** {p['spanish']} | **English:** {p['english']}")
