@@ -32,19 +32,12 @@ if not supabase:
     st.error("⚠️ Supabase credentials missing! Please configure `SUPABASE_URL` and `SUPABASE_KEY` in Streamlit Secrets.")
     st.stop()
 
-# --- SIDEBAR NAVIGATION ---
-st.sidebar.header("Navigation")
-nav_choice = st.sidebar.radio(
-    "Select Mode:",
-    ["📚 Phrase Library", "📁 Upload CSV / TSV File", "✍️ Type / Paste Bilingual Phrases"]
-)
-
-# --- HELPER: AUDIO GENERATION ---
-async def generate_audio_async(text, voice, output_path):
-    communicate = edge_tts.Communicate(text, voice)
+# --- HELPER: AUDIO GENERATION WITH RATE CONTROL ---
+async def generate_audio_async(text, voice, rate_str, output_path):
+    communicate = edge_tts.Communicate(text, voice, rate=rate_str)
     await communicate.save(output_path)
 
-def get_audio_bytes(text, voice="es-ES-AlvaroNeural"):
+def get_audio_bytes(text, voice="es-ES-AlvaroNeural", rate_str="+0%"):
     if not text:
         return None
     loop = asyncio.new_event_loop()
@@ -52,7 +45,7 @@ def get_audio_bytes(text, voice="es-ES-AlvaroNeural"):
     with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tf:
         tmp_path = tf.name
     try:
-        loop.run_until_complete(generate_audio_async(text, voice, tmp_path))
+        loop.run_until_complete(generate_audio_async(text, voice, rate_str, tmp_path))
         with open(tmp_path, "rb") as f:
             audio_bytes = f.read()
         return audio_bytes
@@ -64,21 +57,33 @@ def get_audio_bytes(text, voice="es-ES-AlvaroNeural"):
             os.remove(tmp_path)
 
 
-# --- MODE 1: PHRASE LIBRARY ---
-if nav_choice == "📚 Phrase Library":
-    st.header("Phrase Library & Audio Generator")
+# --- TOP-LEVEL TABS (REPLACING THE SIDEBAR) ---
+tab_practice, tab_upload, tab_paste = st.tabs([
+    "📚 Practice Studio & Library",
+    "📁 Upload CSV / TSV File",
+    "✍️ Type / Paste Phrases"
+])
+
+
+# ==========================================
+# TAB 1: PRACTICE STUDIO & LIBRARY
+# ==========================================
+with tab_practice:
+    st.header("Listening Drill Studio")
     
     try:
         decks_res = supabase.table("decks").select("name").execute()
         deck_names = [d["name"] for d in decks_res.data] if decks_res.data else []
     except Exception as e:
         deck_names = []
-        st.sidebar.warning(f"Could not load decks from Supabase: {e}")
+        st.warning(f"Could not load decks from Supabase: {e}")
 
     if not deck_names:
-        st.info("No decks found in Supabase yet. Use 'Upload CSV / TSV File' or 'Type / Paste Bilingual Phrases' to add your first deck!")
+        st.info("No decks found in Supabase yet. Use the 'Upload CSV / TSV File' or 'Type / Paste Phrases' tabs above to add your first deck!")
     else:
-        selected_deck = st.selectbox("Select Deck", deck_names)
+        # Step 1: Deck Selection
+        selected_deck = st.selectbox("Select Drill Deck:", deck_names)
+        
         if selected_deck:
             try:
                 phrases_res = supabase.table("phrases").select("*").eq("deck_name", selected_deck).execute()
@@ -87,52 +92,93 @@ if nav_choice == "📚 Phrase Library":
                 phrases_data = []
                 st.error(f"Error loading phrases for deck '{selected_deck}': {e}")
             
-            st.subheader(f"Deck: {selected_deck} ({len(phrases_data)} phrases)")
+            st.markdown(f"**Loaded Deck:** `{selected_deck}` ({len(phrases_data)} phrases available)")
+            st.divider()
             
-            if st.button("Prepare / Rebuild Audio Chunks"):
-                with st.spinner("Generating audio chunks via edge-tts..."):
-                    for item in phrases_data:
-                        spanish_text = item.get("spanish")
-                        if spanish_text:
-                            audio_bytes = get_audio_bytes(spanish_text)
-                            if audio_bytes and supabase:
-                                try:
-                                    file_path = f"{selected_deck}/{hash(spanish_text)}.mp3"
-                                    supabase.storage.from_("audio-cache").upload(
-                                        file_path, audio_bytes, file_options={"upsert": "true"}
-                                    )
-                                except Exception:
-                                    pass
-                    st.success("Audio chunks successfully prepared and cached!")
+            # Step 2: Inline Drill Controls & Settings
+            st.subheader("⚙️ Practice Settings")
+            c1, c2, c3, c4 = st.columns(4)
             
+            with c1:
+                speed_choice = st.selectbox(
+                    "Speech Speed",
+                    ["Normal (0%)", "Slower (-15%)", "Slow (-30%)", "Faster (+15%)"],
+                    index=0
+                )
+                rate_mapping = {
+                    "Normal (0%)": "+0%",
+                    "Slower (-15%)": "-15%",
+                    "Slow (-30%)": "-30%",
+                    "Faster (+15%)": "+15%"
+                }
+                selected_rate = rate_mapping[speed_choice]
+                
+            with c2:
+                repetitions = st.number_input("Repetitions per phrase", min_value=1, max_value=5, value=1)
+                
+            with c3:
+                pause_duration = st.slider("Pause between phrases (s)", 0.0, 5.0, 1.5, 0.5)
+                
+            with c4:
+                show_translation = st.checkbox("Show English Translations", value=True)
+            
+            st.divider()
+            
+            # Step 3: Audio Cache & Phrase List
+            col_action1, col_action2 = st.columns([2, 2])
+            with col_action1:
+                if st.button("🔄 Prepare / Rebuild Audio Chunks", type="secondary"):
+                    with st.spinner("Generating audio chunks via edge-tts..."):
+                        for item in phrases_data:
+                            spanish_text = item.get("spanish")
+                            if spanish_text:
+                                audio_bytes = get_audio_bytes(spanish_text, rate_str=selected_rate)
+                                if audio_bytes and supabase:
+                                    try:
+                                        file_path = f"{selected_deck}/{hash(spanish_text)}.mp3"
+                                        supabase.storage.from_("audio-cache").upload(
+                                            file_path, audio_bytes, file_options={"upsert": "true"}
+                                        )
+                                    except Exception:
+                                        pass
+                        st.success("Audio chunks successfully prepared and cached!")
+            
+            st.subheader("Phrase List & Audio Player")
             for idx, p in enumerate(phrases_data, 1):
                 target = p.get("spanish", "")
                 translation = p.get("english", "")
-                col_a, col_b = st.columns([3, 1])
-                with col_a:
-                    st.markdown(f"**{idx}.** {target} *(Translation: {translation})*")
-                with col_b:
-                    if st.button("Play Audio", key=f"play_{idx}"):
-                        audio_data = get_audio_bytes(target)
+                
+                row_cols = st.columns([3, 1])
+                with row_cols[0]:
+                    if show_translation:
+                        st.markdown(f"**{idx}.** {target} &nbsp;|&nbsp; *{translation}*")
+                    else:
+                        st.markdown(f"**{idx}.** {target}")
+                with row_cols[1]:
+                    if st.button("▶ Play", key=f"play_{idx}"):
+                        audio_data = get_audio_bytes(target, rate_str=selected_rate)
                         if audio_data:
-                            st.audio(audio_data, format="audio/mp3")
+                            st.audio(audio_data, format="audio/mp3", autoplay=True)
 
 
-# --- MODE 2: UPLOAD CSV / TSV FILE ---
-elif nav_choice == "📁 Upload CSV / TSV File":
+# ==========================================
+# TAB 2: UPLOAD CSV / TSV FILE
+# ==========================================
+with tab_upload:
     st.header("Upload Bilingual Phrase File")
-    uploaded_file = st.file_uploader("Choose a CSV or TSV file (Columns: spanish, english)", type=["csv", "tsv", "txt"])
-    deck_title_input = st.text_input("Deck Name:", value="My Imported Deck")
+    st.markdown("Upload a CSV or TSV file containing your phrase pairs (expected columns: `spanish`, `english`).")
+    
+    uploaded_file = st.file_uploader("Choose a file", type=["csv", "tsv", "txt"])
+    deck_title_input = st.text_input("New Deck Name:", value="Imported Deck")
     
     if uploaded_file is not None:
         try:
-            # Auto-detect separator based on file extension
             if uploaded_file.name.endswith('.tsv') or uploaded_file.name.endswith('.txt'):
                 df = pd.read_csv(uploaded_file, sep='\t')
             else:
                 df = pd.read_csv(uploaded_file)
                 
-            st.write("File uploaded successfully! Preview (first 5 rows):")
+            st.write("File preview (first 5 rows):")
             st.dataframe(df.head())
             
             if st.button("Save Deck to Supabase", type="primary"):
@@ -143,7 +189,6 @@ elif nav_choice == "📁 Upload CSV / TSV File":
                         st.warning(f"Deck upsert notice: {e}")
                     
                     success_count = 0
-                    # Expecting columns like 'spanish' and 'english' (case-insensitive search)
                     cols = {c.lower(): c for c in df.columns}
                     col_es = cols.get('spanish', df.columns[0] if len(df.columns) > 0 else None)
                     col_en = cols.get('english', df.columns[1] if len(df.columns) > 1 else col_es)
@@ -165,18 +210,20 @@ elif nav_choice == "📁 Upload CSV / TSV File":
             st.error(f"Error parsing file: {e}")
 
 
-# --- MODE 3: TYPE / PASTE BILINGUAL PHRASES ---
-elif nav_choice == "✍️ Type / Paste Bilingual Phrases":
+# ==========================================
+# TAB 3: TYPE / PASTE PHRASES
+# ==========================================
+with tab_paste:
     st.header("Type or Paste Bilingual Phrases")
-    st.markdown("Enter phrases with Spanish and English separated by a tab or comma (e.g. `Hola,Hello` or `Buenos días	Good morning`).")
+    st.markdown("Enter phrase pairs line by line separated by a pipe `|`, comma `,`, or tab.")
     
     raw_text = st.text_area(
-        "Enter phrases (format: Spanish | English per line):",
+        "Phrase pairs:",
         placeholder="Hola | Hello\n¿Cómo estás? | How are you?\nBuenos días | Good morning",
         height=150
     )
     
-    deck_title = st.text_input("New Deck Title:", value="My Custom Deck")
+    deck_title = st.text_input("Deck Title:", value="Custom Deck")
     separator_choice = st.selectbox("Delimiter separator used:", ["| (Pipe)", ", (Comma)", "\\t (Tab)"])
     
     if st.button("Process & Save Deck", type="primary"):
@@ -215,4 +262,4 @@ elif nav_choice == "✍️ Type / Paste Bilingual Phrases":
             
             st.subheader("Phrase Preview")
             for idx, p in enumerate(processed_phrases, 1):
-                st.markdown(f"**{idx}. Spanish:** {p['spanish']} | **English:** {p['english']}")
+                st.markdown(f"**{idx}.** {p['spanish']} &nbsp;|&nbsp; *{p['english']}*")
