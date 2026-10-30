@@ -10,7 +10,7 @@ import edge_tts
 
 # --- PAGE CONFIG ---
 st.set_page_config(
-    page_title="Language Drill Studio",
+    page_title="Language Practice Studio",
     page_icon="🗣️",
     layout="wide"
 )
@@ -27,8 +27,8 @@ def init_supabase():
 supabase: Client = init_supabase()
 
 # --- APP HEADER ---
-st.title("🗣️ Language Drill Studio")
-st.markdown("Practice and build listening drills with persistent Supabase storage and natural text-to-speech.")
+st.title("🗣️ Language Practice Studio")
+st.markdown("Practice speaking and listening skills.")
 
 if not supabase:
     st.error("⚠️ Supabase credentials missing! Please configure `SUPABASE_URL` and `SUPABASE_KEY` in Streamlit Secrets.")
@@ -88,7 +88,7 @@ tab_practice, tab_upload, tab_paste = st.tabs([
 # TAB 1: PRACTICE STUDIO & LIBRARY
 # ==========================================
 with tab_practice:
-    st.header("Listening Drill Studio")
+    st.header("Speaking and Listening Studio")
     
     # Reload deck list from Supabase
     try:
@@ -103,7 +103,7 @@ with tab_practice:
     else:
         col_deck_sel, col_deck_del = st.columns([3, 1])
         with col_deck_sel:
-            selected_deck = st.selectbox("Select Drill Deck:", deck_names, key="active_deck_select")
+            selected_deck = st.selectbox("Select Practice Deck:", deck_names, key="active_deck_select")
         with col_deck_del:
             st.write("") 
             st.write("") 
@@ -231,7 +231,7 @@ with tab_practice:
                     # Display Text Logic
                     if reverse_recall:
                         main_text = translation if translation else "(No translation)"
-                        sub_text = target if show_translation else "🔊 [Spanish audio playing...]"
+                        sub_text = target if show_translation else "🔊 [Recall and Say the Spanish]"
                     else:
                         main_text = target
                         sub_text = f"*{translation}*" if show_translation else ""
@@ -319,7 +319,7 @@ with tab_practice:
 with tab_upload:
     st.header("Upload Bilingual Phrase File")
     uploaded_file = st.file_uploader("Choose a CSV or TSV file", type=["csv", "tsv", "txt"])
-    deck_title_input = st.text_input("New Deck Name:", value="Imported Deck")
+    deck_title_input = st.text_input("New Deck Name:", placeholder="Imported Deck")
     
     if uploaded_file is not None:
         try:
@@ -367,8 +367,8 @@ with tab_paste:
         height=150
     )
     
-    deck_title = st.text_input("Deck Title:", value="Custom Deck")
-    separator_choice = st.selectbox("Delimiter separator used:", ["| (Pipe)", ", (Comma)", "\\t (Tab)"])
+    deck_title = st.text_input("New Deck Title:", placeholder="(Add your new deck name here.)")
+    separator_choice = st.selectbox("Select delimiter separator used:", ["| (Pipe)", ", (Comma)", "\\t (Tab)"])
     
     if st.button("Process & Save Deck", type="primary"):
         if not raw_text.strip():
