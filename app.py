@@ -28,7 +28,7 @@ supabase: Client = init_supabase()
 
 # --- APP HEADER ---
 st.title("🗣️ Language Practice Studio")
-st.markdown("Practice speaking and listening skills.")
+st.markdown("Choose *Practice Studio & Library* to Practice speaking and listening skills. Choose Upload File or Type/Paste to create a new pfrase list. ")
 
 if not supabase:
     st.error("⚠️ Supabase credentials missing! Please configure `SUPABASE_URL` and `SUPABASE_KEY` in Streamlit Secrets.")
