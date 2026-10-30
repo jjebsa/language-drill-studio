@@ -77,7 +77,7 @@ if "current_phrase_idx" not in st.session_state:
 
 
 # --- TOP-LEVEL TABS ---
-tab_practice, tab_upload, tab_paste = st.subeader([
+tab_practice, tab_upload, tab_paste = st.subheader([
     "📚 Practice Studio & Library",
     "📁 Upload CSV / TSV File",
     "✍️ Type / Paste Phrases"
