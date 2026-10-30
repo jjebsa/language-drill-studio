@@ -28,7 +28,7 @@ supabase: Client = init_supabase()
 
 # --- APP HEADER ---
 st.title("🗣️ Language Drill Studio")
-st.markdown("Practice Listen Repeat Recall")
+st.markdown("Practice and build listening drills with persistent Supabase storage and natural text-to-speech.")
 
 if not supabase:
     st.error("⚠️ Supabase credentials missing! Please configure `SUPABASE_URL` and `SUPABASE_KEY` in Streamlit Secrets.")
@@ -65,6 +65,15 @@ def play_audio_silently(audio_bytes):
     b64 = base64.b64encode(audio_bytes).decode()
     audio_html = f'<audio autoplay="true" src="data:audio/mp3;base64,{b64}"></audio>'
     st.markdown(audio_html, unsafe_allow_html=True)
+
+
+# --- INITIALIZE SESSION STATE FOR DRILL RUNNER ---
+if "drill_active" not in st.session_state:
+    st.session_state["drill_active"] = False
+if "drill_paused" not in st.session_state:
+    st.session_state["drill_paused"] = False
+if "current_phrase_idx" not in st.session_state:
+    st.session_state["current_phrase_idx"] = 0
 
 
 # --- TOP-LEVEL TABS ---
@@ -163,7 +172,8 @@ with tab_practice:
                 speed_choice = st.selectbox(
                     "Speech Speed",
                     ["Normal (0%)", "Slower (-15%)", "Slow (-30%)", "Faster (+15%)"],
-                    index=0
+                    index=0,
+                    key="setting_speed"
                 )
                 rate_mapping = {
                     "Normal (0%)": "+0%",
@@ -174,51 +184,110 @@ with tab_practice:
                 selected_rate = rate_mapping[speed_choice]
                 
             with c2:
-                repetitions = st.number_input("Repetitions per phrase", min_value=1, max_value=5, value=1)
+                repetitions = st.number_input("Repetitions per phrase", min_value=1, max_value=5, value=1, key="setting_reps")
                 
             with c3:
-                pause_duration = st.slider("Pause between phrases (s)", 0.0, 5.0, 1.5, 0.5)
+                pause_duration = st.slider("Pause between phrases (s)", 0.0, 10.0, 2.0, 0.5, key="setting_pause")
                 
             with c4:
-                show_translation = st.checkbox("Show English Translations", value=True)
+                reverse_recall = st.checkbox("Reverse Recall (Show EN, play ES)", value=False, key="setting_reverse")
+                show_translation = st.checkbox("Show Translations", value=True, key="setting_show_trans")
             
             st.divider()
             
             # Global Drill Controls
             st.subheader("🎧 Global Drill Player")
             
-            col_p1, col_p2 = st.columns([2, 2])
+            col_p1, col_p2, col_p3 = st.columns([2, 2, 2])
             with col_p1:
-                start_drill = st.button("▶️ Start Full Sequential Drill", type="primary", use_container_width=True)
+                if st.button("▶️ Start / Restart Drill", type="primary", use_container_width=True):
+                    st.session_state["drill_active"] = True
+                    st.session_state["drill_paused"] = False
+                    st.session_state["current_phrase_idx"] = 0
+                    st.rerun()
+                    
             with col_p2:
-                stop_drill = st.button("⏹️ Stop Drill", type="secondary", use_container_width=True)
+                pause_label = "▶️ Resume Drill" if st.session_state["drill_paused"] else "⏸️ Pause Drill"
+                if st.button(pause_label, use_container_width=True, disabled=not st.session_state["drill_active"]):
+                    st.session_state["drill_paused"] = not st.session_state["drill_paused"]
+                    st.rerun()
+                    
+            with col_p3:
+                if st.button("⏹️ Stop Drill", type="secondary", use_container_width=True, disabled=not st.session_state["drill_active"]):
+                    st.session_state["drill_active"] = False
+                    st.session_state["drill_paused"] = False
+                    st.session_state["current_phrase_idx"] = 0
+                    st.rerun()
 
-            # Continuous Drill Execution Loop
-            if start_drill:
-                drill_placeholder = st.empty()
+            # Active Stateful Drill Display
+            if st.session_state["drill_active"] and phrases_data:
+                curr_idx = st.session_state["current_phrase_idx"]
                 
-                for idx, p in enumerate(phrases_data, 1):
+                if curr_idx < len(phrases_data):
+                    p = phrases_data[curr_idx]
                     target = p.get("spanish", "")
                     translation = p.get("english", "")
                     
-                    display_text = f"### 🔊 Playing [{idx}/{len(phrases_data)}]: **{target}**"
-                    if show_translation:
-                        display_text += f"\n*Translation: {translation}*"
-                    drill_placeholder.markdown(display_text)
+                    # Display Text Logic
+                    if reverse_recall:
+                        main_text = translation if translation else "(No translation)"
+                        sub_text = target if show_translation else "🔊 [Spanish audio playing...]"
+                    else:
+                        main_text = target
+                        sub_text = f"*{translation}*" if show_translation else ""
                     
-                    audio_bytes = get_audio_bytes(target, rate_str=selected_rate)
+                    # Render Dark Focus Card
+                    border_color = "#ffc107" if st.session_state["drill_paused"] else "#ffffff"
+                    status_badge = " <span style='color:#ffc107; font-size:1rem;'>(PAUSED)</span>" if st.session_state["drill_paused"] else ""
                     
-                    if audio_bytes:
-                        for rep in range(repetitions):
-                            play_audio_silently(audio_bytes)
-                            time.sleep(2.0) # Wait for audio duration buffer
-                            if pause_duration > 0 and rep < repetitions - 1:
-                                time.sleep(pause_duration)
+                    st.markdown(f"""
+                    <div style="background-color: #0e1117; color: #ffffff; padding: 40px; border-radius: 12px; text-align: center; border: 1px solid {border_color}; margin: 20px 0;">
+                        <h2 style="color: #ffffff; font-size: 2.5rem; margin-bottom: 15px;">{main_text}{status_badge}</h2>
+                        <h4 style="color: #adb5bd; font-weight: 400; margin: 0;">{sub_text}</h4>
+                    </div>
+                    """, unsafe_allow_html=True)
                     
-                    if pause_duration > 0:
-                        time.sleep(pause_duration)
-                
-                drill_placeholder.success("🎉 Drill completed!")
+                    # Navigation Controls while drill is active
+                    col_nav1, col_nav2 = st.columns([1, 1])
+                    with col_nav1:
+                        if st.button("⏮️ Previous Phrase", use_container_width=True) and curr_idx > 0:
+                            st.session_state["current_phrase_idx"] -= 1
+                            st.rerun()
+                    with col_nav2:
+                        if st.button("⏭️ Next Phrase", use_container_width=True) and curr_idx < len(phrases_data) - 1:
+                            st.session_state["current_phrase_idx"] += 1
+                            st.rerun()
+
+                    # Audio Playback Loop (Only triggers when NOT paused)
+                    if not st.session_state["drill_paused"]:
+                        # Distribute pause duration cleanly for recall mode (60% thinking time before audio, 40% after)
+                        thinking_time = (pause_duration * 0.6) if reverse_recall else 0
+                        post_audio_pause = pause_duration - thinking_time if reverse_recall else pause_duration
+
+                        if thinking_time > 0:
+                            time.sleep(thinking_time)
+                        
+                        audio_bytes = get_audio_bytes(target, rate_str=selected_rate)
+                        if audio_bytes:
+                            for rep in range(repetitions):
+                                play_audio_silently(audio_bytes)
+                                time.sleep(1.2) # Snappy audio buffer
+                                if post_audio_pause > 0 and rep < repetitions - 1:
+                                    time.sleep(post_audio_pause)
+                        
+                        if post_audio_pause > 0:
+                            time.sleep(post_audio_pause)
+                        
+                        # Automatically step to next phrase
+                        if st.session_state["current_phrase_idx"] < len(phrases_data) - 1:
+                            st.session_state["current_phrase_idx"] += 1
+                            st.rerun()
+                        else:
+                            st.session_state["drill_active"] = False
+                            st.success("🎉 Drill completed!")
+                            st.rerun()
+                else:
+                    st.session_state["drill_active"] = False
 
             st.divider()
             
@@ -230,10 +299,13 @@ with tab_practice:
                 
                 row_cols = st.columns([3, 1])
                 with row_cols[0]:
-                    if show_translation:
-                        st.markdown(f"**{idx}.** {target} &nbsp;|&nbsp; *{translation}*")
+                    if reverse_recall:
+                        display_str = f"**{idx}.** {translation} &nbsp;|&nbsp; *(Think of Spanish)*"
+                    elif show_translation:
+                        display_str = f"**{idx}.** {target} &nbsp;|&nbsp; *{translation}*"
                     else:
-                        st.markdown(f"**{idx}.** {target}")
+                        display_str = f"**{idx}.** {target}"
+                    st.markdown(display_str)
                 with row_cols[1]:
                     if st.button("▶ Play", key=f"play_single_{idx}"):
                         audio_data = get_audio_bytes(target, rate_str=selected_rate)
@@ -324,4 +396,3 @@ with tab_paste:
             
             st.success(f"Successfully saved deck '{deck_title}'! Refreshing...")
             st.rerun()
-            
