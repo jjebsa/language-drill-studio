@@ -1,4 +1,4 @@
-import streamlit as st
+8import streamlit as st
 import asyncio
 import os
 import tempfile
@@ -28,7 +28,7 @@ supabase: Client = init_supabase()
 
 # --- APP HEADER ---
 st.title("🗣️ Language Practice Studio")
-st.markdown("Choose **Practice Studio & Library** to practice speaking and listening skills. Choose *Upload File* or *Type/Paste* to create a new phrase list. ")
+st.markdown("Choose *Practice Studio & Library* to practice speaking and listening skills. Choose *Upload File* or *Type/Paste* to create a new phrase list. ")
 
 if not supabase:
     st.error("⚠️ Supabase credentials missing! Please configure `SUPABASE_URL` and `SUPABASE_KEY` in Streamlit Secrets.")
