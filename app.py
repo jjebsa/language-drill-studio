@@ -171,16 +171,16 @@ with tab_practice:
             with c1:
                 speed_choice = st.selectbox(
                     "Speech Speed",
-                    ["Normal", "Slow (90%)", "Slower (80%)", "Slowest (70%)", "Faster (115%)"],
+                    ["Normal", "Slow", "Slower", "Slowest", "Faster"],
                     index=0,
                     key="setting_speed"
                 )
                 rate_mapping = {
                     "Normal": "+0%",
-                    "Slow (90%)": "-10%",
-                    "Slower (80%)": "-20%",
-                    "Slowest (70%): "-30%",
-                    "Faster (115%)": "+15%"
+                    "Slow": "-10%",
+                    "Slower": "-20%",
+                    "Slowest": "-30%",
+                    "Faster": "+15%"
                 }
                 selected_rate = rate_mapping[speed_choice]
                 
