@@ -196,7 +196,7 @@ with tab_practice:
             st.divider()
             
             # Global Drill Controls
-            st.subheader("🎧 Global Drill Player")
+            st.subheader("🎧 List Player")
             
             col_p1, col_p2, col_p3 = st.columns([2, 2, 2])
             with col_p1:
