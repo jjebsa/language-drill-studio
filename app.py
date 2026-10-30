@@ -187,7 +187,7 @@ with tab_practice:
                 repetitions = st.number_input("Repetitions per phrase", min_value=1, max_value=5, value=1, key="setting_reps")
                 
             with c3:
-                pause_duration = st.slider("Pause between phrases (s)", 0.0, 10.0, 2.0, 0.5, key="setting_pause")
+                pause_duration = st.number_input("Pause between phrases (s)", 0.0, 10.0, 2.0, 0.5, key="setting_pause")
                 
             with c4:
                 reverse_recall = st.checkbox("Reverse Recall (Show EN, play ES)", value=False, key="setting_reverse")
