@@ -180,7 +180,7 @@ with tab_practice:
                     "Slow (90%)": "-10%",
                     "Slower (80%)": "-20%",
                     "Very Slow (70%): "-30%",
-                    "Slowest (60%): "-40%"
+                    "Slowest (60%): "-40%",
                     "Faster (115%)": "+15%"
                 }
                 selected_rate = rate_mapping[speed_choice]
