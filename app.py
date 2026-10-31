@@ -329,8 +329,10 @@ with tab_upload:
     
     if uploaded_file is not None:
         try:
-            # Automatically detects commas, tabs, or custom delimiters regardless of extension
-            df = pd.read_csv(uploaded_file, sep=None, engine='python')
+            if uploaded_file.name.endswith('.tsv') or uploaded_file.name.endswith('.txt'):
+                df = pd.read_csv(uploaded_file, sep='\t')
+            else:
+                df = pd.read_csv(uploaded_file)
                 
             st.write("File preview (first 5 rows):")
             st.dataframe(df.head())
