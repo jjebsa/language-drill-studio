@@ -329,17 +329,18 @@ with tab_upload:
     
     if uploaded_file is not None:
         try:
-            if uploaded_file.name.endswith('.tsv') or uploaded_file.name.endswith('.txt'):
-                df = pd.read_csv(uploaded_file, sep='\t')
-            else:
-                df = pd.read_csv(uploaded_file)
+            # Automatically detects commas, tabs, or custom delimiters regardless of extension
+            df = pd.read_csv(uploaded_file, sep=None, engine='python')
                 
             st.write("File preview (first 5 rows):")
             st.dataframe(df.head())
             
             if st.button("Save Deck to Supabase", type="primary"):
-                with st.spinner("Saving deck to Supabase..."):
-                    supabase.table("decks").upsert({"name": deck_title_input}).execute()
+                if not deck_title_input.strip():
+                    st.warning("Please enter a valid Deck Name before saving.")
+                else:
+                    with st.spinner("Saving deck to Supabase..."):
+                        # ... rest of your save code ...
                     
                     cols = {c.lower(): c for c in df.columns}
                     col_es = cols.get('spanish', df.columns[0] if len(df.columns) > 0 else None)
