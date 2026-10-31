@@ -262,30 +262,31 @@ with tab_practice:
                             st.session_state["current_phrase_idx"] += 1
                             st.rerun()
 
-                                        # Audio Playback Loop (Only triggers when NOT paused)
+                    # Audio Playback Loop (Only triggers when NOT paused)
                     if not st.session_state["drill_paused"]:
-                        # Calculate dynamic scaling based on word count (approx. 0.35s per word, capped between 1.5s and the user's slider max)
-                        word_count = len(target.split())
-                        dynamic_phrase_pause = max(pause_duration, word_count * 0.35)
-
-                        # Distribute pause duration cleanly for recall mode (60% thinking time before audio, remainder after)
-                        thinking_time = (dynamic_phrase_pause * 0.6) if reverse_recall else 0
-                        post_audio_pause = dynamic_phrase_pause - thinking_time if reverse_recall else dynamic_phrase_pause
-
-                        if thinking_time > 0:
-                            time.sleep(thinking_time)
-                        
                         audio_bytes = get_audio_bytes(target, rate_str=selected_rate)
+                        
                         if audio_bytes:
+                            # Calculate exact audio duration from MP3 byte size (48kbps mono = 6,000 bytes/sec)
+                            # This automatically factors in natural pauses, ellipses (...), and punctuation!
+                            audio_duration = len(audio_bytes) / 6000.0
+                            
+                            # Distribute pause duration for recall mode (thinking time before audio plays)
+                            thinking_time = (pause_duration * 0.5) if reverse_recall else 0
+                            post_audio_pause = pause_duration - thinking_time if reverse_recall else pause_duration
+
+                            if thinking_time > 0:
+                                time.sleep(thinking_time)
+                            
                             for rep in range(repetitions):
                                 play_audio_silently(audio_bytes)
-                                # Buffer wait scaled slightly by word count for longer sentences
-                                time.sleep(max(1.2, word_count * 0.25)) 
+                                # Wait for the exact duration of the audio file to finish playing
+                                time.sleep(audio_duration)
                                 if post_audio_pause > 0 and rep < repetitions - 1:
                                     time.sleep(post_audio_pause)
-                        
-                        if post_audio_pause > 0:
-                            time.sleep(post_audio_pause)
+                            
+                            if post_audio_pause > 0:
+                                time.sleep(post_audio_pause)
                         
                         # Automatically step to next phrase
                         if st.session_state["current_phrase_idx"] < len(phrases_data) - 1:
@@ -297,6 +298,7 @@ with tab_practice:
                             st.rerun()
                 else:
                     st.session_state["drill_active"] = False
+
 
 
             st.divider()
