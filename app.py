@@ -1,4 +1,4 @@
-import streamlit as st
+8import streamlit as st
 import asyncio
 import os
 import tempfile
@@ -67,7 +67,7 @@ def play_audio_silently(audio_bytes):
     st.markdown(audio_html, unsafe_allow_html=True)
 
 def inject_drill_helpers(is_active):
-    """Injects JS to keep the mobile screen awake and auto-scroll/center the focus card during active drills."""
+    """Injects JS to keep the mobile screen awake and forcefully scroll/center the focus card during active drills."""
     if is_active:
         wake_lock_js = """
         <script>
@@ -83,18 +83,21 @@ def inject_drill_helpers(is_active):
         }
         requestWakeLock();
         
-        // Auto-scroll/center the focus card container into view smoothly
-        setTimeout(() => {
+        // Force immediate and smooth centering of the focus card
+        function centerFocusCard() {
             const card = document.getElementById('focus-card-container');
             if (card) {
                 card.scrollIntoView({ behavior: 'smooth', block: 'center' });
             }
-        }, 50);
+        }
+        
+        // Run immediately and backstop with a short delay for mobile rendering
+        centerFocusCard();
+        setTimeout(centerFocusCard, 100);
         </script>
         """
         st.markdown(wake_lock_js, unsafe_allow_html=True)
     else:
-        # Release wake lock code when drill is inactive/stopped
         release_js = """
         <script>
         if (typeof wakeLock !== 'undefined' && wakeLock !== null) {
@@ -103,6 +106,7 @@ def inject_drill_helpers(is_active):
         </script>
         """
         st.markdown(release_js, unsafe_allow_html=True)
+
         
 # --- INITIALIZE SESSION STATE FOR DRILL RUNNER ---
 if "drill_active" not in st.session_state:
