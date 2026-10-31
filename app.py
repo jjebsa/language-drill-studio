@@ -281,34 +281,30 @@ with tab_practice:
                         main_text = target
                         sub_text = f"*{translation}*" if show_translation else ""
                     
-                    # Render Dark Focus Card with an ID for auto-centering
+                                        # Render Dark Focus Card with an ID and CSS snap-scroll for mobile
                     border_color = "#ffc107" if st.session_state["drill_paused"] else "#ffffff"
                     status_badge = " <span style='color:#ffc107; font-size:1rem;'>(PAUSED)</span>" if st.session_state["drill_paused"] else ""
                     
                     st.markdown(f"""
-                    <div id="focus-card-container" style="background-color: #0e1117; color: #ffffff; padding: 40px; border-radius: 12px; text-align: center; border: 1px solid {border_color}; margin: 20px 0;">
+                    <div id="focus-card-container" style="background-color: #0e1117; color: #ffffff; padding: 40px; border-radius: 12px; text-align: center; border: 1px solid {border_color}; margin: 20px 0; scroll-margin-top: 150px;">
                         <h2 style="color: #ffffff; font-size: 2.5rem; margin-bottom: 15px;">{main_text}{status_badge}</h2>
                         <h4 style="color: #adb5bd; font-weight: 400; margin: 0;">{sub_text}</h4>
                     </div>
                     """, unsafe_allow_html=True)
 
-                    # Keep screen awake and auto-center view on mobile
+                    # Keep screen awake and auto-center view *before* entering the audio sleep loop
                     inject_drill_helpers(st.session_state["drill_active"])
                     
                     # Navigation Controls while drill is active
                     col_nav1, col_nav2 = st.columns([1, 1])
-
 
                     # Audio Playback Loop (Only triggers when NOT paused)
                     if not st.session_state["drill_paused"]:
                         audio_bytes = get_audio_bytes(target, rate_str=selected_rate)
                         
                         if audio_bytes:
-                            # Calculate exact audio duration from MP3 byte size (48kbps mono = 6,000 bytes/sec)
-                            # This automatically factors in natural pauses, ellipses (...), and punctuation!
                             audio_duration = len(audio_bytes) / 6000.0
                             
-                            # Distribute pause duration for recall mode (thinking time before audio plays)
                             thinking_time = (pause_duration * 0.5) if reverse_recall else 0
                             post_audio_pause = pause_duration - thinking_time if reverse_recall else pause_duration
 
@@ -317,7 +313,6 @@ with tab_practice:
                             
                             for rep in range(repetitions):
                                 play_audio_silently(audio_bytes)
-                                # Wait for the exact duration of the audio file to finish playing
                                 time.sleep(audio_duration)
                                 if post_audio_pause > 0 and rep < repetitions - 1:
                                     time.sleep(post_audio_pause)
@@ -335,8 +330,6 @@ with tab_practice:
                             st.rerun()
                 else:
                     st.session_state["drill_active"] = False
-
-
 
             st.divider()
             
