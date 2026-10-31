@@ -126,23 +126,21 @@ with tab_practice:
             
             st.markdown(f"**Loaded Deck:** `{selected_deck}` ({len(phrases_data)} phrases available)")
             
-            # --- EDIT DECK & PHRASES EXPANDER ---
+                        # --- EDIT DECK & PHRASES EXPANDER ---
             with st.expander("✏️ Edit Deck Name & Phrases"):
-                new_deck_name = st.text_input("Rename Deck", value=selected_deck, key="rename_deck_input")
-                if st.button("Update Deck Name"):
+                # Dynamic key ensures the text box updates when you switch decks
+                new_deck_name = st.text_input("Rename Deck", value=selected_deck, key=f"rename_deck_input_{selected_deck}")
+                if st.button("Update Deck Name", key=f"update_deck_btn_{selected_deck}"):
                     if new_deck_name and new_deck_name != selected_deck:
                         try:
-                            # 1. First, insert the new deck name so it exists as a parent
                             supabase.table("decks").upsert({"name": new_deck_name}).execute()
-                            # 2. Reassign all child phrases to point to the new deck name
                             supabase.table("phrases").update({"deck_name": new_deck_name}).eq("deck_name", selected_deck).execute()
-                            # 3. Now that no phrases reference it, safely delete the old deck
                             supabase.table("decks").delete().eq("name", selected_deck).execute()
-                            
                             st.success("Deck renamed successfully!")
                             st.rerun()
                         except Exception as e:
                             st.error(f"Error renaming deck: {e}")
+
                 
                 st.markdown("### Modify Phrases")
                 df_phrases = pd.DataFrame(phrases_data)
