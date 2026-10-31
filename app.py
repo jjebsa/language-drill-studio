@@ -264,7 +264,7 @@ with tab_practice:
                     st.session_state["current_phrase_idx"] = 0
                     st.rerun()
 
-            # Active Stateful Drill Display
+                        # Active Stateful Drill Display
             if st.session_state["drill_active"] and phrases_data:
                 curr_idx = st.session_state["current_phrase_idx"]
                 
@@ -273,7 +273,7 @@ with tab_practice:
                     target = p.get("spanish", "")
                     translation = p.get("english", "")
                     
-                                        # Display Text Logic
+                    # Display Text Logic
                     if reverse_recall:
                         main_text = translation if translation else "(No translation)"
                         sub_text = target if show_translation else "🔊 [Recall and Say the Spanish]"
@@ -281,22 +281,40 @@ with tab_practice:
                         main_text = target
                         sub_text = f"*{translation}*" if show_translation else ""
                     
-                                        # Render Dark Focus Card with an ID and CSS snap-scroll for mobile
+                    # Render Dark Focus Card with embedded auto-centering script
                     border_color = "#ffc107" if st.session_state["drill_paused"] else "#ffffff"
                     status_badge = " <span style='color:#ffc107; font-size:1rem;'>(PAUSED)</span>" if st.session_state["drill_paused"] else ""
                     
                     st.markdown(f"""
-                    <div id="focus-card-container" style="background-color: #0e1117; color: #ffffff; padding: 40px; border-radius: 12px; text-align: center; border: 1px solid {border_color}; margin: 20px 0; scroll-margin-top: 150px;">
+                    <div id="focus-card-container" style="background-color: #0e1117; color: #ffffff; padding: 40px; border-radius: 12px; text-align: center; border: 1px solid {border_color}; margin: 20px 0;">
                         <h2 style="color: #ffffff; font-size: 2.5rem; margin-bottom: 15px;">{main_text}{status_badge}</h2>
                         <h4 style="color: #adb5bd; font-weight: 400; margin: 0;">{sub_text}</h4>
                     </div>
+                    <script>
+                        (function() {
+                            const card = document.getElementById('focus-card-container');
+                            if (card) {
+                                card.scrollIntoView({{ behavior: 'smooth', block: 'center' }});
+                            }
+                        })();
+                    </script>
                     """, unsafe_allow_html=True)
 
-                    # Keep screen awake and auto-center view *before* entering the audio sleep loop
+                    # Keep screen awake via wake lock helper function
                     inject_drill_helpers(st.session_state["drill_active"])
                     
-                    # Navigation Controls while drill is active
+                    # Navigation Controls while drill is active (Restored!)
                     col_nav1, col_nav2 = st.columns([1, 1])
+                    with col_nav1:
+                        if st.button("⬅️ Previous", use_container_width=True, disabled=curr_idx == 0):
+                            if st.session_state["current_phrase_idx"] > 0:
+                                st.session_state["current_phrase_idx"] -= 1
+                                st.rerun()
+                    with col_nav2:
+                        if st.button("➡️ Next", use_container_width=True, disabled=curr_idx >= len(phrases_data) - 1):
+                            if st.session_state["current_phrase_idx"] < len(phrases_data) - 1:
+                                st.session_state["current_phrase_idx"] += 1
+                                st.rerun()
 
                     # Audio Playback Loop (Only triggers when NOT paused)
                     if not st.session_state["drill_paused"]:
