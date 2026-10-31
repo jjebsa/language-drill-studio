@@ -66,7 +66,44 @@ def play_audio_silently(audio_bytes):
     audio_html = f'<audio autoplay="true" src="data:audio/mp3;base64,{b64}"></audio>'
     st.markdown(audio_html, unsafe_allow_html=True)
 
-
+def inject_drill_helpers(is_active):
+    """Injects JS to keep the mobile screen awake and auto-scroll/center the focus card during active drills."""
+    if is_active:
+        wake_lock_js = """
+        <script>
+        let wakeLock = null;
+        async function requestWakeLock() {
+            try {
+                if ('wakeLock' in navigator) {
+                    wakeLock = await navigator.wakeLock.request('screen');
+                }
+            } catch (err) {
+                console.log(err);
+            }
+        }
+        requestWakeLock();
+        
+        // Auto-scroll/center the focus card container into view smoothly
+        setTimeout(() => {
+            const card = document.getElementById('focus-card-container');
+            if (card) {
+                card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }, 50);
+        </script>
+        """
+        st.markdown(wake_lock_js, unsafe_allow_html=True)
+    else:
+        # Release wake lock code when drill is inactive/stopped
+        release_js = """
+        <script>
+        if (typeof wakeLock !== 'undefined' && wakeLock !== null) {
+            wakeLock.release().then(() => { wakeLock = null; });
+        }
+        </script>
+        """
+        st.markdown(release_js, unsafe_allow_html=True)
+        
 # --- INITIALIZE SESSION STATE FOR DRILL RUNNER ---
 if "drill_active" not in st.session_state:
     st.session_state["drill_active"] = False
