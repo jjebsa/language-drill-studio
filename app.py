@@ -281,7 +281,7 @@ with tab_practice:
                         main_text = target
                         sub_text = f"*{translation}*" if show_translation else ""
                     
-                    # Render Dark Focus Card with embedded auto-centering script
+                    # Render Dark Focus Card with embedded auto-centering script (double curly braces for f-string safety)
                     border_color = "#ffc107" if st.session_state["drill_paused"] else "#ffffff"
                     status_badge = " <span style='color:#ffc107; font-size:1rem;'>(PAUSED)</span>" if st.session_state["drill_paused"] else ""
                     
@@ -291,19 +291,19 @@ with tab_practice:
                         <h4 style="color: #adb5bd; font-weight: 400; margin: 0;">{sub_text}</h4>
                     </div>
                     <script>
-                        (function() {
+                        (function() {{
                             const card = document.getElementById('focus-card-container');
-                            if (card) {
+                            if (card) {{
                                 card.scrollIntoView({{ behavior: 'smooth', block: 'center' }});
-                            }
-                        })();
+                            }}
+                        }})();
                     </script>
                     """, unsafe_allow_html=True)
 
                     # Keep screen awake via wake lock helper function
                     inject_drill_helpers(st.session_state["drill_active"])
                     
-                    # Navigation Controls while drill is active (Restored!)
+                    # Navigation Controls while drill is active
                     col_nav1, col_nav2 = st.columns([1, 1])
                     with col_nav1:
                         if st.button("⬅️ Previous", use_container_width=True, disabled=curr_idx == 0):
@@ -348,6 +348,7 @@ with tab_practice:
                             st.rerun()
                 else:
                     st.session_state["drill_active"] = False
+
 
             st.divider()
             
