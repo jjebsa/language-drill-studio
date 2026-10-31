@@ -132,8 +132,13 @@ with tab_practice:
                 if st.button("Update Deck Name"):
                     if new_deck_name and new_deck_name != selected_deck:
                         try:
-                            supabase.table("decks").update({"name": new_deck_name}).eq("name", selected_deck).execute()
+                            # 1. First, insert the new deck name so it exists as a parent
+                            supabase.table("decks").upsert({"name": new_deck_name}).execute()
+                            # 2. Reassign all child phrases to point to the new deck name
                             supabase.table("phrases").update({"deck_name": new_deck_name}).eq("deck_name", selected_deck).execute()
+                            # 3. Now that no phrases reference it, safely delete the old deck
+                            supabase.table("decks").delete().eq("name", selected_deck).execute()
+                            
                             st.success("Deck renamed successfully!")
                             st.rerun()
                         except Exception as e:
@@ -324,10 +329,8 @@ with tab_upload:
     
     if uploaded_file is not None:
         try:
-            if uploaded_file.name.endswith('.tsv') or uploaded_file.name.endswith('.txt'):
-                df = pd.read_csv(uploaded_file, sep='\t')
-            else:
-                df = pd.read_csv(uploaded_file)
+            # Automatically detects commas, tabs, or custom delimiters regardless of extension
+            df = pd.read_csv(uploaded_file, sep=None, engine='python')
                 
             st.write("File preview (first 5 rows):")
             st.dataframe(df.head())
