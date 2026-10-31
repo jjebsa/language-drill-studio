@@ -238,7 +238,7 @@ with tab_practice:
                         sub_text = target if show_translation else "🔊 [Recall and Say the Spanish]"
                     else:
                         main_text = target
-                        sub_text = f"*{translation}*" if show_translation else ""
+                        sub_text = f"{translation}" if show_translation else ""
                     
                     # Render Dark Focus Card
                     border_color = "#ffc107" if st.session_state["drill_paused"] else "#ffffff"
