@@ -340,25 +340,25 @@ with tab_upload:
                     st.warning("Please enter a valid Deck Name before saving.")
                 else:
                     with st.spinner("Saving deck to Supabase..."):
-                        # ... rest of your save code ...
-                    
-                    cols = {c.lower(): c for c in df.columns}
-                    col_es = cols.get('spanish', df.columns[0] if len(df.columns) > 0 else None)
-                    col_en = cols.get('english', df.columns[1] if len(df.columns) > 1 else col_es)
-                    
-                    success_count = 0
-                    for _, row in df.iterrows():
-                        spanish_val = str(row[col_es]) if col_es else ""
-                        english_val = str(row[col_en]) if col_en else ""
-                        supabase.table("phrases").insert({
-                            "deck_name": deck_title_input,
-                            "spanish": spanish_val,
-                            "english": english_val
-                        }).execute()
-                        success_count += 1
-                    
-                    st.success(f"Successfully saved deck '{deck_title_input}' with {success_count} phrases!")
-                    st.rerun()
+                        supabase.table("decks").upsert({"name": deck_title_input}).execute()
+                        
+                        cols = {c.lower(): c for c in df.columns}
+                        col_es = cols.get('spanish', df.columns[0] if len(df.columns) > 0 else None)
+                        col_en = cols.get('english', df.columns[1] if len(df.columns) > 1 else col_es)
+                        
+                        success_count = 0
+                        for _, row in df.iterrows():
+                            spanish_val = str(row[col_es]) if col_es else ""
+                            english_val = str(row[col_en]) if col_en else ""
+                            supabase.table("phrases").insert({
+                                "deck_name": deck_title_input,
+                                "spanish": spanish_val,
+                                "english": english_val
+                            }).execute()
+                            success_count += 1
+                        
+                        st.success(f"Successfully saved deck '{deck_title_input}' with {success_count} phrases!")
+                        st.rerun()
         except Exception as e:
             st.error(f"Error parsing file: {e}")
 
