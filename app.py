@@ -262,11 +262,15 @@ with tab_practice:
                             st.session_state["current_phrase_idx"] += 1
                             st.rerun()
 
-                    # Audio Playback Loop (Only triggers when NOT paused)
+                                        # Audio Playback Loop (Only triggers when NOT paused)
                     if not st.session_state["drill_paused"]:
-                        # Distribute pause duration cleanly for recall mode (60% thinking time before audio, 40% after)
-                        thinking_time = (pause_duration * 0.6) if reverse_recall else 0
-                        post_audio_pause = pause_duration - thinking_time if reverse_recall else pause_duration
+                        # Calculate dynamic scaling based on word count (approx. 0.35s per word, capped between 1.5s and the user's slider max)
+                        word_count = len(target.split())
+                        dynamic_phrase_pause = max(pause_duration, word_count * 0.35)
+
+                        # Distribute pause duration cleanly for recall mode (60% thinking time before audio, remainder after)
+                        thinking_time = (dynamic_phrase_pause * 0.6) if reverse_recall else 0
+                        post_audio_pause = dynamic_phrase_pause - thinking_time if reverse_recall else dynamic_phrase_pause
 
                         if thinking_time > 0:
                             time.sleep(thinking_time)
@@ -275,7 +279,8 @@ with tab_practice:
                         if audio_bytes:
                             for rep in range(repetitions):
                                 play_audio_silently(audio_bytes)
-                                time.sleep(1.2) # Snappy audio buffer
+                                # Buffer wait scaled slightly by word count for longer sentences
+                                time.sleep(max(1.2, word_count * 0.25)) 
                                 if post_audio_pause > 0 and rep < repetitions - 1:
                                     time.sleep(post_audio_pause)
                         
@@ -292,6 +297,7 @@ with tab_practice:
                             st.rerun()
                 else:
                     st.session_state["drill_active"] = False
+
 
             st.divider()
             
