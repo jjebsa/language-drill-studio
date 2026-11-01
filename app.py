@@ -18,23 +18,20 @@ st.set_page_config(
 # --- CUSTOM COMPACT STYLING & CONDENSED LAYOUT ---
 st.markdown("""
 <style>
-    /* Reduce top/bottom padding of main container */
     .block-container {
         padding-top: 1rem !important;
         padding-bottom: 1rem !important;
     }
-    /* Compact Headings */
     h1 { font-size: 1.4rem !important; margin-bottom: 0.2rem !important; }
     h2 { font-size: 1.2rem !important; margin-top: 0.2rem !important; margin-bottom: 0.2rem !important; }
     h3 { font-size: 1.0rem !important; margin-top: 0.2rem !important; margin-bottom: 0.2rem !important; }
     
-    /* Smaller Tab Titles */
     .stTabs [data-baseweb="tab"] {
-        font-size: 0.9rem !important;
-        padding-top: 2px !important;
-        padding-bottom: 2px !important;
+        font-size: 0.95rem !important;
+        padding-top: 6px !important;
+        padding-bottom: 6px !important;
+        font-weight: 600 !important;
     }
-    /* Tighten vertical gaps */
     hr { margin: 0.6rem 0 !important; }
 </style>
 """, unsafe_allow_html=True)
@@ -79,7 +76,6 @@ def get_audio_bytes(text, voice="es-ES-AlvaroNeural", rate_str="+0%"):
             os.remove(tmp_path)
 
 def play_audio_silently(audio_bytes):
-    """Injects base64 encoded audio into HTML to play automatically without any visible player UI."""
     if not audio_bytes:
         return
     b64 = base64.b64encode(audio_bytes).decode()
@@ -87,7 +83,6 @@ def play_audio_silently(audio_bytes):
     st.markdown(audio_html, unsafe_allow_html=True)
 
 def inject_drill_helpers(is_active):
-    """Injects JS to keep the mobile screen awake during active drills."""
     if is_active:
         wake_lock_js = """
         <script>
@@ -139,7 +134,7 @@ if "drill_paused" not in st.session_state:
 if "current_phrase_idx" not in st.session_state:
     st.session_state["current_phrase_idx"] = 0
 
-# --- TOP-LEVEL TABS ---
+# --- MAIN TOP-LEVEL TABS ---
 tab_practice, tab_upload, tab_paste = st.tabs([
     "📚 Practice Studio",
     "📁 Upload File",
@@ -150,7 +145,6 @@ tab_practice, tab_upload, tab_paste = st.tabs([
 # TAB 1: PRACTICE STUDIO & LIBRARY
 # ==========================================
 with tab_practice:
-    # Reload deck list from Supabase
     try:
         decks_res = supabase.table("decks").select("name").execute()
         deck_names = [d["name"] for d in decks_res.data] if decks_res.data else []
@@ -161,7 +155,6 @@ with tab_practice:
     if not deck_names:
         st.info("No decks found in Supabase yet. Use the 'Upload File' or 'Type / Paste' tabs above to add your first deck!")
     else:
-        # --- TITLE & DECK SELECTOR ON ONE LINE ---
         top_col1, top_col2 = st.columns([1.5, 2.5])
         with top_col1:
             st.markdown("### 🗣️ Practice Studio")
@@ -176,7 +169,6 @@ with tab_practice:
                 phrases_data = []
                 st.error(f"Error loading phrases for deck '{selected_deck}': {e}")
             
-            # --- EDIT DECK & DELETE EXPANDER ---
             with st.expander("✏️ Edit Deck & Phrases"):
                 new_deck_name = st.text_input("Rename Deck", value=selected_deck, key=f"rename_deck_input_{selected_deck}")
                 if st.button("Update Deck Name", key=f"update_deck_btn_{selected_deck}"):
@@ -219,7 +211,6 @@ with tab_practice:
                 if st.button("🗑️ Delete Selected Deck", type="secondary"):
                     confirm_delete_dialog(selected_deck)
 
-            # Toggle practice settings compactly
             settings_open = st.toggle("⚙️ Practice Settings", value=False, key="toggle_settings")
             
             if settings_open:
@@ -249,7 +240,6 @@ with tab_practice:
             }
             selected_rate = rate_mapping[speed_choice]
             
-            # --- ACTIVE STATEFUL DRILL DISPLAY (PLACED ABOVE CONTROLS) ---
             if st.session_state["drill_active"] and phrases_data:
                 curr_idx = st.session_state["current_phrase_idx"]
                 
@@ -268,7 +258,6 @@ with tab_practice:
                     border_color = "#ffc107" if st.session_state["drill_paused"] else "#30363d"
                     status_badge = " <span style='color:#ffc107; font-size:0.8rem;'>(PAUSED)</span>" if st.session_state["drill_paused"] else ""
                     
-                    # Condensed focus container
                     st.markdown(f"""
                     <div style="height: 180px; display: flex; align-items: center; justify-content: center; background-color: #0d1117; border-radius: 8px; border: 1px solid {border_color}; margin: 5px 0; padding: 15px;">
                         <div style="text-align: center;">
@@ -280,7 +269,6 @@ with tab_practice:
 
                     inject_drill_helpers(st.session_state["drill_active"])
                     
-                    # Navigation Controls directly beneath card
                     col_nav1, col_nav2 = st.columns([1, 1])
                     with col_nav1:
                         if st.button("⬅️ Previous", use_container_width=True, disabled=curr_idx == 0):
@@ -295,7 +283,6 @@ with tab_practice:
 
             st.divider()
             
-            # --- GLOBAL DRILL CONTROLS ---
             col_p1, col_p2, col_p3 = st.columns([2, 2, 2])
             with col_p1:
                 if st.button("▶️ Start / Restart", type="primary", use_container_width=True, key="start_drill_btn"):
@@ -317,7 +304,6 @@ with tab_practice:
                     st.session_state["current_phrase_idx"] = 0
                     st.rerun()
 
-            # Audio Playback Loop Trigger (Executes if active and not paused)
             if st.session_state["drill_active"] and not st.session_state["drill_paused"] and phrases_data:
                 curr_idx = st.session_state["current_phrase_idx"]
                 if curr_idx < len(phrases_data):
@@ -352,7 +338,6 @@ with tab_practice:
 
             st.divider()
             
-            # Phrase List Preview
             with st.expander(f"📋 Phrase List ({len(phrases_data)} items)"):
                 for idx, p in enumerate(phrases_data, 1):
                     target = p.get("spanish", "")
@@ -377,6 +362,7 @@ with tab_practice:
 # TAB 2: UPLOAD CSV / TSV FILE
 # ==========================================
 with tab_upload:
+    st.markdown("### Upload Bilingual Phrase File")
     uploaded_file = st.file_uploader("Choose CSV or TSV file", type=["csv", "tsv", "txt"])
     deck_title_input = st.text_input("New Deck Name:", placeholder="Imported Deck")
     
@@ -413,13 +399,28 @@ with tab_upload:
 # TAB 3: TYPE / PASTE PHRASES
 # ==========================================
 with tab_paste:
+    st.markdown("### Type or Paste Phrases")
     raw_text = st.text_area("Phrase pairs (Format: Spanish | English):", placeholder="Hola | Hello\n¿Cómo estás? | How are you?", height=120)
-    deck_title = st.text_input("New Deck Title:", placeholder="My Deck")
-    separator_choice = st.selectbox("Delimiter:", ["| (Pipe)", ", (Comma)", "Tab"])
+    deck_title = st.text_input("New Deck Title:", placeholder="My Deck", key="paste_deck_title")
+    separator_choice = st.selectbox("Delimiter:", ["| (Pipe)", ", (Comma)", "Tab"], key="paste_delimiter")
     
     if st.button("Process & Save Deck", type="primary"):
         if not raw_text.strip():
             st.warning("Please enter phrase pairs.")
         else:
             sep = "|" if "|" in separator_choice else ("," if "," in separator_choice else "\t")
-      
+            lines = [line.strip() for line in raw_text.split("\n") if line.strip()]
+            supabase.table("decks").upsert({"name": deck_title}).execute()
+            
+            for line in lines:
+                if sep in line:
+                    parts = line.split(sep, 1)
+                    spanish_text, english_text = parts[0].strip(), parts[1].strip()
+                else:
+                    spanish_text, english_text = line, line
+                
+                supabase.table("phrases").insert({
+                    "deck_name": deck_title,
+                    "spanish": spanish_text,
+                    "english": english_text
+                }).e
