@@ -237,11 +237,12 @@ with tab_practice:
                     border_color = "#ffc107" if st.session_state["drill_paused"] else "#30363d"
                     status_badge = " <span style='color:#ffc107; font-size:0.8rem;'>(PAUSED)</span>" if st.session_state["drill_paused"] else ""
                     
+                    # Direct DIV rendering prevents Streamlit H2 CSS overrides
                     st.markdown(f"""
-                    <div style="height: 200px; display: flex; align-items: center; justify-content: center; background-color: #0d1117; border-radius: 8px; border: 1px solid {border_color}; margin: 5px 0; padding: 15px;">
-                        <div style="text-align: center;">
-                            <h2 style="color: #ffffff; font-size: 1.6rem !important; margin: 0 0 8px 0 !important;">{main_text}{status_badge}</h2>
-                            <h4 style="color: #8b949e; font-size: 1.0rem; font-weight: 400; margin: 0;">{sub_text}</h4>
+                    <div style="min-height: 190px; display: flex; align-items: center; justify-content: center; background-color: #0d1117; border-radius: 8px; border: 1px solid {border_color}; margin: 5px 0; padding: 12px 16px;">
+                        <div style="text-align: center; width: 100%;">
+                            <div style="color: #ffffff; font-size: 1.15rem; font-weight: 600; line-height: 1.3; margin-bottom: 8px;">{main_text}{status_badge}</div>
+                            <div style="color: #8b949e; font-size: 0.9rem; font-weight: 400; margin: 0;">{sub_text}</div>
                         </div>
                     </div>
                     """, unsafe_allow_html=True)
@@ -259,6 +260,8 @@ with tab_practice:
                             if st.session_state["current_phrase_idx"] < len(phrases_data) - 1:
                                 st.session_state["current_phrase_idx"] += 1
                                 st.rerun()
+
+            st.divider()
             
             col_p1, col_p2, col_p3 = st.columns([2, 2, 2])
             with col_p1:
