@@ -247,13 +247,14 @@ with tab_practice:
             
             st.divider()
             
+                        st.divider()
+            
             # Global Drill Controls
             st.subheader("🎧 List Player")
-
             
             col_p1, col_p2, col_p3 = st.columns([2, 2, 2])
             with col_p1:
-                if st.button("▶️ Start / Restart Drill", type="primary", use_container_width=True):
+                if st.button("▶️ Start / Restart Drill", type="primary", use_container_width=True, key="start_drill_btn"):
                     st.session_state["drill_active"] = True
                     st.session_state["drill_paused"] = False
                     st.session_state["current_phrase_idx"] = 0
@@ -261,12 +262,12 @@ with tab_practice:
                     
             with col_p2:
                 pause_label = "▶️ Resume Drill" if st.session_state["drill_paused"] else "⏸️ Pause Drill"
-                if st.button(pause_label, use_container_width=True, disabled=not st.session_state["drill_active"]):
+                if st.button(pause_label, use_container_width=True, key="pause_drill_btn", disabled=not st.session_state["drill_active"]):
                     st.session_state["drill_paused"] = not st.session_state["drill_paused"]
                     st.rerun()
                     
             with col_p3:
-                if st.button("⏹️ Stop Drill", type="secondary", use_container_width=True, disabled=not st.session_state["drill_active"]):
+                if st.button("⏹️ Stop Drill", type="secondary", use_container_width=True, key="stop_drill_btn", disabled=not st.session_state["drill_active"]):
                     st.session_state["drill_active"] = False
                     st.session_state["drill_paused"] = False
                     st.session_state["current_phrase_idx"] = 0
