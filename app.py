@@ -316,6 +316,119 @@ with tab_practice:
                                 st.session_state["current_phrase_idx"] += 1
                                 st.rerun()
 
+                st.divider()
+            
+            # Practice Settings wrapped in an expander to declutter the UI
+            with st.expander("⚙️ Practice Settings"):
+                c1, c2, c3, c4 = st.columns(4)
+                
+                with c1:
+                    speed_choice = st.selectbox(
+                        "Speech Speed",
+                        ["Normal", "Slow", "Slower", "Slowest", "Faster"],
+                        index=0,
+                        key="setting_speed"
+                    )
+                    rate_mapping = {
+                        "Normal": "+0%",
+                        "Slow": "-20%",
+                        "Slower": "-30%",
+                        "Slowest": "-40%",
+                        "Faster": "+15%"
+                    }
+                    selected_rate = rate_mapping[speed_choice]
+                    
+                with c2:
+                    repetitions = st.number_input("Repetitions per phrase", min_value=1, max_value=5, value=1, key="setting_reps")
+                    
+                with c3:
+                    pause_duration = st.number_input("Pause between phrases (s) Longer phrases? Choose a longer pause", 1.0, 10.0, 2.0, 0.5, key="setting_pause")
+                    
+                with c4:
+                    reverse_recall = st.checkbox("Reverse Recall (Show EN, play ES)", value=False, key="setting_reverse")
+                    show_translation = st.checkbox("Show Translations", value=True, key="setting_show_trans")
+            
+            st.divider()
+            
+            # Global Drill Controls
+            st.subheader("🎧 List Player")
+            
+            col_p1, col_p2, col_p3 = st.columns([2, 2, 2])
+            with col_p1:
+                if st.button("▶️ Start / Restart Drill", type="primary", use_container_width=True):
+                    st.session_state["drill_active"] = True
+                    st.session_state["drill_paused"] = False
+                    st.session_state["current_phrase_idx"] = 0
+                    st.rerun()
+                    
+            with col_p2:
+                pause_label = "▶️ Resume Drill" if st.session_state["drill_paused"] else "⏸️ Pause Drill"
+                if st.button(pause_label, use_container_width=True, disabled=not st.session_state["drill_active"]):
+                    st.session_state["drill_paused"] = not st.session_state["drill_paused"]
+                    st.rerun()
+                    
+            with col_p3:
+                if st.button("⏹️ Stop Drill", type="secondary", use_container_width=True, disabled=not st.session_state["drill_active"]):
+                    st.session_state["drill_active"] = False
+                    st.session_state["drill_paused"] = False
+                    st.session_state["current_phrase_idx"] = 0
+                    st.rerun()
+
+            # Active Stateful Drill Display
+            if st.session_state["drill_active"] and phrases_data:
+                curr_idx = st.session_state["current_phrase_idx"]
+                
+                if curr_idx < len(phrases_data):
+                    p = phrases_data[curr_idx]
+                    target = p.get("spanish", "")
+                    translation = p.get("english", "")
+                    
+                    # Display Text Logic
+                    if reverse_recall:
+                        main_text = translation if translation else "(No translation)"
+                        sub_text = target if show_translation else "🔊 [Recall and Say the Spanish]"
+                    else:
+                        main_text = target
+                        sub_text = f"*{translation}*" if show_translation else ""
+                    
+                    # Render Dark Focus Card with exact viewport centering JS calculation
+                    border_color = "#ffc107" if st.session_state["drill_paused"] else "#ffffff"
+                    status_badge = " <span style='color:#ffc107; font-size:1rem;'>(PAUSED)</span>" if st.session_state["drill_paused"] else ""
+                    
+                    st.markdown(f"""
+                    <div id="focus-card-container" style="background-color: #0e1117; color: #ffffff; padding: 40px; border-radius: 12px; text-align: center; border: 1px solid {border_color}; margin: 20px 0;">
+                        <h2 style="color: #ffffff; font-size: 2.5rem; margin-bottom: 15px;">{main_text}{status_badge}</h2>
+                        <h4 style="color: #adb5bd; font-weight: 400; margin: 0;">{sub_text}</h4>
+                    </div>
+                    <script>
+                        setTimeout(() => {{
+                            const card = document.getElementById('focus-card-container');
+                            if (card) {{
+                                const rect = card.getBoundingClientRect();
+                                const absoluteTop = window.pageYOffset + rect.top;
+                                const centerTop = absoluteTop - (window.innerHeight / 2) + (rect.height / 2);
+                                window.scrollTo({{ top: centerTop, behavior: 'smooth' }});
+                            }}
+                        }}, 150);
+                    </script>
+                    """, unsafe_allow_html=True)
+
+                    # Keep screen awake via wake lock helper function
+                    inject_drill_helpers(st.session_state["drill_active"])
+                    
+                    # Navigation Controls while drill is active
+                    col_nav1, col_nav2 = st.columns([1, 1])
+                    with col_nav1:
+                        if st.button("⬅️ Previous", use_container_width=True, disabled=curr_idx == 0):
+                            if st.session_state["current_phrase_idx"] > 0:
+                                st.session_state["current_phrase_idx"] -= 1
+                                st.rerun()
+                    with col_nav2:
+                        if st.button("➡️ Next", use_container_width=True, disabled=curr_idx >= len(phrases_data) - 1):
+                            if st.session_state["current_phrase_idx"] < len(phrases_data) - 1:
+                                st.session_state["current_phrase_idx"] += 1
+                                st.rerun()
+
                     # Audio Playback Loop (Only triggers when NOT paused)
                     if not st.session_state["drill_paused"]:
                         audio_bytes = get_audio_bytes(target, rate_str=selected_rate)
@@ -348,6 +461,7 @@ with tab_practice:
                             st.rerun()
                 else:
                     st.session_state["drill_active"] = False
+
 
 
             st.divider()
