@@ -206,6 +206,23 @@ with tab_practice:
                         except Exception as e:
                             st.error(f"Error updating phrases: {e}")
 
+                                  if st.button("Save Phrase Changes", type="primary"):
+                            try:
+                                supabase.table("phrases").delete().eq("deck_name", selected_deck).execute()
+                                for _, row in edited_df.iterrows():
+                                    es = str(row.get("spanish", "")).strip()
+                                    en = str(row.get("english", "")).strip()
+                                    if es:
+                                        supabase.table("phrases").insert({
+                                            "deck_name": selected_deck,
+                                            "spanish": es,
+                                            "english": en
+                                        }).execute()
+                                st.success("Phrases updated successfully!")
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"Error updating phrases: {e}")
+
             st.divider()
             
             # Toggle expander state for practice settings cleanly
@@ -247,10 +264,9 @@ with tab_practice:
             
             st.divider()
             
-                        st.divider()
-            
             # Global Drill Controls
             st.subheader("🎧 List Player")
+
             
             col_p1, col_p2, col_p3 = st.columns([2, 2, 2])
             with col_p1:
