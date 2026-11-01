@@ -130,13 +130,10 @@ def confirm_delete_dialog(deck_name):
             st.rerun()
     with c_confirm:
         if st.button("Confirm Delete", type="primary", use_container_width=True):
-            try:
-                supabase.table("phrases").delete().eq("deck_name", deck_name).execute()
-                supabase.table("decks").delete().eq("name", deck_name).execute()
-                st.toast(f"Deleted deck '{deck_name}'")
-                st.rerun()
-            except Exception as e:
-                st.error(f"Error deleting deck: {e}")
+            supabase.table("phrases").delete().eq("deck_name", deck_name).execute()
+            supabase.table("decks").delete().eq("name", deck_name).execute()
+            st.toast(f"Deleted deck '{deck_name}'")
+            st.rerun()
 
 # --- INITIALIZE SESSION STATE FOR DRILL RUNNER ---
 if "drill_active" not in st.session_state:
@@ -425,4 +422,8 @@ with tab_upload:
                             success_count += 1
                         
                         st.success(f"Successfully saved deck '{deck_title_input}' with {success_count} phrases!")
-               
+                        st.rerun()
+        except Exception as e:
+            st.error(f"Error parsing file: {e}")
+
+# ===================
