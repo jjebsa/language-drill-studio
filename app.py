@@ -241,7 +241,7 @@ with tab_practice:
                     <div style="height: 200px; display: flex; align-items: center; justify-content: center; background-color: #0d1117; border-radius: 8px; border: 1px solid {border_color}; margin: 5px 0; padding: 15px;">
                         <div style="text-align: center;">
                             <h2 style="color: #ffffff; font-size: 1.6rem !important; margin: 0 0 8px 0 !important;">{main_text}{status_badge}</h2>
-                            <h4 style="color: #8b949e; font-size: 0.25rem; font-weight: 400; margin: 0;">{sub_text}</h4>
+                            <h4 style="color: #8b949e; font-size: 1.0rem; font-weight: 400; margin: 0;">{sub_text}</h4>
                         </div>
                     </div>
                     """, unsafe_allow_html=True)
