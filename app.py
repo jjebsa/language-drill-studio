@@ -139,7 +139,7 @@ if "drill_paused" not in st.session_state:
 if "current_phrase_idx" not in st.session_state:
     st.session_state["current_phrase_idx"] = 0
 
-# --- RESTORED TOP-LEVEL TABS ---
+# --- TOP-LEVEL TABS ---
 tab_practice, tab_upload, tab_paste = st.tabs([
     "📚 Practice Studio",
     "📁 Upload File",
@@ -421,4 +421,4 @@ with tab_paste:
         if not raw_text.strip():
             st.warning("Please enter phrase pairs.")
         else:
-            sep = "|" if "|" in separator_choice else ("," if "," in separator_choice el
+            sep = "|" if "|" in separator_choice else ("," if "," in separator_choice else "\t")
