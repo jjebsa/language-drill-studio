@@ -15,27 +15,6 @@ st.set_page_config(
     layout="wide"
 )
 
-# --- CUSTOM COMPACT STYLING & CONDENSED LAYOUT ---
-st.markdown("""
-<style>
-    .block-container {
-        padding-top: 1rem !important;
-        padding-bottom: 1rem !important;
-    }
-    h1 { font-size: 1.4rem !important; margin-bottom: 0.2rem !important; }
-    h2 { font-size: 1.2rem !important; margin-top: 0.2rem !important; margin-bottom: 0.2rem !important; }
-    h3 { font-size: 1.0rem !important; margin-top: 0.2rem !important; margin-bottom: 0.2rem !important; }
-    
-    .stTabs [data-baseweb="tab"] {
-        font-size: 0.95rem !important;
-        padding-top: 6px !important;
-        padding-bottom: 6px !important;
-        font-weight: 600 !important;
-    }
-    hr { margin: 0.6rem 0 !important; }
-</style>
-""", unsafe_allow_html=True)
-
 # --- SUPABASE CONNECTION ---
 @st.cache_resource
 def init_supabase():
@@ -134,7 +113,7 @@ if "drill_paused" not in st.session_state:
 if "current_phrase_idx" not in st.session_state:
     st.session_state["current_phrase_idx"] = 0
 
-# --- MAIN TOP-LEVEL TABS ---
+# --- PROMINENT TOP-LEVEL TABS ---
 tab_practice, tab_upload, tab_paste = st.tabs([
     "📚 Practice Studio",
     "📁 Upload File",
@@ -423,4 +402,7 @@ with tab_paste:
                     "deck_name": deck_title,
                     "spanish": spanish_text,
                     "english": english_text
-                }).e
+                }).execute()
+            
+            st.success(f"Saved deck '{deck_title}'!")
+            st.rerun()
