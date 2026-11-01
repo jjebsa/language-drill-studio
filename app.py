@@ -15,6 +15,30 @@ st.set_page_config(
     layout="wide"
 )
 
+# --- CUSTOM COMPACT STYLING & SMALLER HEADINGS ---
+st.markdown("""
+<style>
+    /* Reduce top padding of main container */
+    .block-container {
+        padding-top: 2rem !important;
+        padding-bottom: 2rem !important;
+    }
+    /* Compact Headings */
+    h1 { font-size: 1.8rem !important; margin-bottom: 0.5rem !important; }
+    h2 { font-size: 1.4rem !important; margin-top: 0.5rem !important; margin-bottom: 0.5rem !important; }
+    h3 { font-size: 1.1rem !important; margin-top: 0.5rem !important; margin-bottom: 0.5rem !important; }
+    
+    /* Smaller Tab Titles */
+    .stTabs [data-baseweb="tab"] {
+        font-size: 0.95rem !important;
+        padding-top: 4px !important;
+        padding-bottom: 4px !important;
+    }
+    /* Reduce divider spacing */
+    hr { margin: 1rem 0 !important; }
+</style>
+""", unsafe_allow_html=True)
+
 # --- SUPABASE CONNECTION ---
 @st.cache_resource
 def init_supabase():
@@ -28,7 +52,7 @@ supabase: Client = init_supabase()
 
 # --- APP HEADER ---
 st.title("🗣️ Language Practice Studio")
-st.markdown("Choose *Practice Studio & Library* to practice speaking and listening skills. Choose *Upload File* or *Type/Paste* to create a new phrase list. ")
+st.caption("Practice speaking and listening skills, or manage your bilingual phrase decks.")
 
 if not supabase:
     st.error("⚠️ Supabase credentials missing! Please configure `SUPABASE_URL` and `SUPABASE_KEY` in Streamlit Secrets.")
@@ -95,7 +119,25 @@ def inject_drill_helpers(is_active):
         """
         st.markdown(release_js, unsafe_allow_html=True)
 
-        
+# --- DIALOG: DELETE CONFIRMATION ---
+@st.dialog("Confirm Deck Deletion")
+def confirm_delete_dialog(deck_name):
+    st.write(f"Are you sure you want to delete the deck **'{deck_name}'**?")
+    st.caption("This action will permanently delete all associated phrases.")
+    c_cancel, c_confirm = st.columns(2)
+    with c_cancel:
+        if st.button("Cancel", use_container_width=True):
+            st.rerun()
+    with c_confirm:
+        if st.button("Confirm Delete", type="primary", use_container_width=True):
+            try:
+                supabase.table("phrases").delete().eq("deck_name", deck_name).execute()
+                supabase.table("decks").delete().eq("name", deck_name).execute()
+                st.toast(f"Deleted deck '{deck_name}'")
+                st.rerun()
+            except Exception as e:
+                st.error(f"Error deleting deck: {e}")
+
 # --- INITIALIZE SESSION STATE FOR DRILL RUNNER ---
 if "drill_active" not in st.session_state:
     st.session_state["drill_active"] = False
@@ -104,14 +146,12 @@ if "drill_paused" not in st.session_state:
 if "current_phrase_idx" not in st.session_state:
     st.session_state["current_phrase_idx"] = 0
 
-
 # --- TOP-LEVEL TABS ---
 tab_practice, tab_upload, tab_paste = st.tabs([
     "📚 Practice Studio & Library",
     "📁 Upload CSV / TSV File",
     "✍️ Type / Paste Phrases"
 ])
-
 
 # ==========================================
 # TAB 1: PRACTICE STUDIO & LIBRARY
@@ -135,15 +175,9 @@ with tab_practice:
             selected_deck = st.selectbox("Select Practice Deck:", deck_names, key="active_deck_select")
         with col_deck_del:
             st.write("") 
-            st.write("") 
-            if st.button("🗑️ Delete Deck", type="secondary"):
+            if st.button("🗑️ Delete Deck", type="secondary", use_container_width=True):
                 if selected_deck:
-                    try:
-                        supabase.table("decks").delete().eq("name", selected_deck).execute()
-                        st.success(f"Deleted deck '{selected_deck}'!")
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Error deleting deck: {e}")
+                    confirm_delete_dialog(selected_deck)
 
         if selected_deck:
             try:
@@ -153,7 +187,7 @@ with tab_practice:
                 phrases_data = []
                 st.error(f"Error loading phrases for deck '{selected_deck}': {e}")
             
-            st.markdown(f"**Loaded Deck:** `{selected_deck}` ({len(phrases_data)} phrases available)")
+            st.caption(f"Loaded Deck: **{selected_deck}** ({len(phrases_data)} phrases)")
             
             # --- EDIT DECK & PHRASES EXPANDER ---
             with st.expander("✏️ Edit Deck Name & Phrases"):
@@ -192,8 +226,6 @@ with tab_practice:
                         except Exception as e:
                             st.error(f"Error updating phrases: {e}")
 
-            st.divider()
-            
             # Toggle expander state for practice settings cleanly
             settings_open = st.toggle("⚙️ Practice Settings", value=False, key="toggle_settings")
             
@@ -210,12 +242,11 @@ with tab_practice:
                 with c2:
                     repetitions = st.number_input("Repetitions per phrase", min_value=1, max_value=5, value=1, key="setting_reps")
                 with c3:
-                    pause_duration = st.number_input("Pause between phrases (s) Longer phrases? Choose a longer pause", 1.0, 10.0, 2.0, 0.5, key="setting_pause")
+                    pause_duration = st.number_input("Pause between phrases (s)", 1.0, 10.0, 2.0, 0.5, key="setting_pause")
                 with c4:
                     reverse_recall = st.checkbox("Reverse Recall (Show EN, play ES)", value=False, key="setting_reverse")
                     show_translation = st.checkbox("Show Translations", value=True, key="setting_show_trans")
             else:
-                # Fallback values when settings panel is collapsed so the app never throws an undefined variable error
                 speed_choice = st.session_state.get("setting_speed", "Normal")
                 repetitions = st.session_state.get("setting_reps", 1)
                 pause_duration = st.session_state.get("setting_pause", 2.0)
@@ -234,8 +265,6 @@ with tab_practice:
             st.divider()
             
             # Global Drill Controls
-            st.subheader("🎧 List Player")
-            
             col_p1, col_p2, col_p3 = st.columns([2, 2, 2])
             with col_p1:
                 if st.button("▶️ Start / Restart Drill", type="primary", use_container_width=True, key="start_drill_btn"):
@@ -274,32 +303,22 @@ with tab_practice:
                         main_text = target
                         sub_text = f"*{translation}*" if show_translation else ""
                     
-                    # Render Dark Focus Card with exact viewport centering JS calculation
-                    border_color = "#ffc107" if st.session_state["drill_paused"] else "#ffffff"
-                    status_badge = " <span style='color:#ffc107; font-size:1rem;'>(PAUSED)</span>" if st.session_state["drill_paused"] else ""
+                    border_color = "#ffc107" if st.session_state["drill_paused"] else "#30363d"
+                    status_badge = " <span style='color:#ffc107; font-size:0.9rem;'>(PAUSED)</span>" if st.session_state["drill_paused"] else ""
                     
+                    # Centered focus container with fixed height viewport
                     st.markdown(f"""
-                    <div id="focus-card-container" style="background-color: #0e1117; color: #ffffff; padding: 40px; border-radius: 12px; text-align: center; border: 1px solid {border_color}; margin: 20px 0;">
-                        <h2 style="color: #ffffff; font-size: 2.5rem; margin-bottom: 15px;">{main_text}{status_badge}</h2>
-                        <h4 style="color: #adb5bd; font-weight: 400; margin: 0;">{sub_text}</h4>
+                    <div style="height: 220px; display: flex; align-items: center; justify-content: center; background-color: #0d1117; border-radius: 10px; border: 1px solid {border_color}; margin: 10px 0; padding: 20px;">
+                        <div style="text-align: center;">
+                            <h2 style="color: #ffffff; font-size: 1.8rem !important; margin: 0 0 10px 0 !important;">{main_text}{status_badge}</h2>
+                            <h4 style="color: #8b949e; font-size: 1.1rem; font-weight: 400; margin: 0;">{sub_text}</h4>
+                        </div>
                     </div>
-                    <script>
-                        setTimeout(() => {{
-                            const card = document.getElementById('focus-card-container');
-                            if (card) {{
-                                const rect = card.getBoundingClientRect();
-                                const absoluteTop = window.pageYOffset + rect.top;
-                                const centerTop = absoluteTop - (window.innerHeight / 2) + (rect.height / 2);
-                                window.scrollTo({{ top: centerTop, behavior: 'smooth' }});
-                            }}
-                        }}, 150);
-                    </script>
                     """, unsafe_allow_html=True)
 
-                    # Keep screen awake via wake lock helper function
                     inject_drill_helpers(st.session_state["drill_active"])
                     
-                    # Navigation Controls while drill is active
+                    # Navigation Controls directly beneath card
                     col_nav1, col_nav2 = st.columns([1, 1])
                     with col_nav1:
                         if st.button("⬅️ Previous", use_container_width=True, disabled=curr_idx == 0):
@@ -368,7 +387,6 @@ with tab_practice:
                         if audio_data:
                             play_audio_silently(audio_data)
 
-
 # ==========================================
 # TAB 2: UPLOAD CSV / TSV FILE
 # ==========================================
@@ -379,7 +397,6 @@ with tab_upload:
     
     if uploaded_file is not None:
         try:
-            # Automatically detects commas, tabs, or custom delimiters regardless of extension
             df = pd.read_csv(uploaded_file, sep=None, engine='python')
                 
             st.write("File preview (first 5 rows):")
@@ -408,48 +425,4 @@ with tab_upload:
                             success_count += 1
                         
                         st.success(f"Successfully saved deck '{deck_title_input}' with {success_count} phrases!")
-                        st.rerun()
-        except Exception as e:
-            st.error(f"Error parsing file: {e}")
-
-
-# ==========================================
-# TAB 3: TYPE / PASTE PHRASES
-# ==========================================
-with tab_paste:
-    st.header("Type or Paste Bilingual Phrases")
-    raw_text = st.text_area(
-        "Phrase pairs (format: Spanish | English):",
-        placeholder="Hola | Hello\n¿Cómo estás? | How are you?\nBuenos días | Good morning",
-        height=150
-    )
-    
-    deck_title = st.text_input("New Deck Title:", placeholder="(Add your new deck name here.)")
-    separator_choice = st.selectbox("Select delimiter separator used:", ["| (Pipe)", ", (Comma)", "\\t (Tab)"])
-    
-    if st.button("Process & Save Deck", type="primary"):
-        if not raw_text.strip():
-            st.warning("Please enter at least one phrase pair.")
-        else:
-            sep = "|" if "|" in separator_choice else ("," if "," in separator_choice else "\t")
-            lines = [line.strip() for line in raw_text.split("\n") if line.strip()]
-            
-            supabase.table("decks").upsert({"name": deck_title}).execute()
-            
-            for line in lines:
-                if sep in line:
-                    parts = line.split(sep, 1)
-                    spanish_text = parts[0].strip()
-                    english_text = parts[1].strip()
-                else:
-                    spanish_text = line
-                    english_text = line
-                
-                supabase.table("phrases").insert({
-                    "deck_name": deck_title,
-                    "spanish": spanish_text,
-                    "english": english_text
-                }).execute()
-            
-            st.success(f"Successfully saved deck '{deck_title}'! Refreshing...")
-            st.rerun()
+                        
