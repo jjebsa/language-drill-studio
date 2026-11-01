@@ -24,8 +24,8 @@ st.markdown("""
         padding-bottom: 1rem !important;
     }
     /* Compact Headings */
-    h1 { font-size: 1.6rem !important; margin-bottom: 0.2rem !important; }
-    h2 { font-size: 1.3rem !important; margin-top: 0.2rem !important; margin-bottom: 0.2rem !important; }
+    h1 { font-size: 1.4rem !important; margin-bottom: 0.2rem !important; }
+    h2 { font-size: 1.2rem !important; margin-top: 0.2rem !important; margin-bottom: 0.2rem !important; }
     h3 { font-size: 1.0rem !important; margin-top: 0.2rem !important; margin-bottom: 0.2rem !important; }
     
     /* Smaller Tab Titles */
@@ -36,7 +36,6 @@ st.markdown("""
     }
     /* Tighten vertical gaps */
     hr { margin: 0.6rem 0 !important; }
-    div[data-baseweb="select"] { margin-bottom: -10px !important; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -50,9 +49,6 @@ def init_supabase():
     return create_client(url, key)
 
 supabase: Client = init_supabase()
-
-# --- APP HEADER ---
-st.title("🗣️ Language Practice Studio")
 
 if not supabase:
     st.error("⚠️ Supabase credentials missing! Please configure `SUPABASE_URL` and `SUPABASE_KEY` in Streamlit Secrets.")
@@ -165,13 +161,12 @@ with tab_practice:
     if not deck_names:
         st.info("No decks found in Supabase yet. Use the 'Upload File' or 'Type / Paste' tabs above to add your first deck!")
     else:
-        col_deck_sel, col_deck_del = st.columns([3, 1])
-        with col_deck_sel:
+        # --- TITLE & DECK SELECTOR ON ONE LINE ---
+        top_col1, top_col2 = st.columns([1.5, 2.5])
+        with top_col1:
+            st.markdown("### 🗣️ Practice Studio")
+        with top_col2:
             selected_deck = st.selectbox("Select Deck:", deck_names, key="active_deck_select", label_visibility="collapsed")
-        with col_deck_del:
-            if st.button("🗑️ Delete", type="secondary", use_container_width=True):
-                if selected_deck:
-                    confirm_delete_dialog(selected_deck)
 
         if selected_deck:
             try:
@@ -181,8 +176,8 @@ with tab_practice:
                 phrases_data = []
                 st.error(f"Error loading phrases for deck '{selected_deck}': {e}")
             
-            # --- COMPACT EDIT EXPANDER ---
-            with st.expander("✏️ Edit Deck Name & Phrases"):
+            # --- EDIT DECK & DELETE EXPANDER ---
+            with st.expander("✏️ Edit Deck & Phrases"):
                 new_deck_name = st.text_input("Rename Deck", value=selected_deck, key=f"rename_deck_input_{selected_deck}")
                 if st.button("Update Deck Name", key=f"update_deck_btn_{selected_deck}"):
                     if new_deck_name and new_deck_name != selected_deck:
@@ -195,6 +190,7 @@ with tab_practice:
                         except Exception as e:
                             st.error(f"Error renaming deck: {e}")
 
+                st.markdown("---")
                 st.markdown("### Modify Phrases")
                 df_phrases = pd.DataFrame(phrases_data)
                 if not df_phrases.empty:
@@ -217,6 +213,11 @@ with tab_practice:
                             st.rerun()
                         except Exception as e:
                             st.error(f"Error updating phrases: {e}")
+
+                st.markdown("---")
+                st.markdown("### Danger Zone")
+                if st.button("🗑️ Delete Selected Deck", type="secondary"):
+                    confirm_delete_dialog(selected_deck)
 
             # Toggle practice settings compactly
             settings_open = st.toggle("⚙️ Practice Settings", value=False, key="toggle_settings")
@@ -248,29 +249,7 @@ with tab_practice:
             }
             selected_rate = rate_mapping[speed_choice]
             
-            # Global Drill Controls (tightened spacing right above start)
-            col_p1, col_p2, col_p3 = st.columns([2, 2, 2])
-            with col_p1:
-                if st.button("▶️ Start / Restart", type="primary", use_container_width=True, key="start_drill_btn"):
-                    st.session_state["drill_active"] = True
-                    st.session_state["drill_paused"] = False
-                    st.session_state["current_phrase_idx"] = 0
-                    st.rerun()
-                    
-            with col_p2:
-                pause_label = "▶️ Resume" if st.session_state["drill_paused"] else "⏸️ Pause"
-                if st.button(pause_label, use_container_width=True, key="pause_drill_btn", disabled=not st.session_state["drill_active"]):
-                    st.session_state["drill_paused"] = not st.session_state["drill_paused"]
-                    st.rerun()
-                    
-            with col_p3:
-                if st.button("⏹️ Stop", type="secondary", use_container_width=True, key="stop_drill_btn", disabled=not st.session_state["drill_active"]):
-                    st.session_state["drill_active"] = False
-                    st.session_state["drill_paused"] = False
-                    st.session_state["current_phrase_idx"] = 0
-                    st.rerun()
-
-            # Active Stateful Drill Display
+            # --- ACTIVE STATEFUL DRILL DISPLAY (PLACED ABOVE CONTROLS) ---
             if st.session_state["drill_active"] and phrases_data:
                 curr_idx = st.session_state["current_phrase_idx"]
                 
@@ -314,40 +293,66 @@ with tab_practice:
                                 st.session_state["current_phrase_idx"] += 1
                                 st.rerun()
 
-                    # Audio Playback Loop
-                    if not st.session_state["drill_paused"]:
-                        audio_bytes = get_audio_bytes(target, rate_str=selected_rate)
-                        
-                        if audio_bytes:
-                            audio_duration = len(audio_bytes) / 6000.0
-                            thinking_time = (pause_duration * 0.5) if reverse_recall else 0
-                            post_audio_pause = pause_duration - thinking_time if reverse_recall else pause_duration
+            st.divider()
+            
+            # --- GLOBAL DRILL CONTROLS ---
+            col_p1, col_p2, col_p3 = st.columns([2, 2, 2])
+            with col_p1:
+                if st.button("▶️ Start / Restart", type="primary", use_container_width=True, key="start_drill_btn"):
+                    st.session_state["drill_active"] = True
+                    st.session_state["drill_paused"] = False
+                    st.session_state["current_phrase_idx"] = 0
+                    st.rerun()
+                    
+            with col_p2:
+                pause_label = "▶️ Resume" if st.session_state["drill_paused"] else "⏸️ Pause"
+                if st.button(pause_label, use_container_width=True, key="pause_drill_btn", disabled=not st.session_state["drill_active"]):
+                    st.session_state["drill_paused"] = not st.session_state["drill_paused"]
+                    st.rerun()
+                    
+            with col_p3:
+                if st.button("⏹️ Stop", type="secondary", use_container_width=True, key="stop_drill_btn", disabled=not st.session_state["drill_active"]):
+                    st.session_state["drill_active"] = False
+                    st.session_state["drill_paused"] = False
+                    st.session_state["current_phrase_idx"] = 0
+                    st.rerun()
 
-                            if thinking_time > 0:
-                                time.sleep(thinking_time)
-                            
-                            for rep in range(repetitions):
-                                play_audio_silently(audio_bytes)
-                                time.sleep(audio_duration)
-                                if post_audio_pause > 0 and rep < repetitions - 1:
-                                    time.sleep(post_audio_pause)
-                            
-                            if post_audio_pause > 0:
+            # Audio Playback Loop Trigger (Executes if active and not paused)
+            if st.session_state["drill_active"] and not st.session_state["drill_paused"] and phrases_data:
+                curr_idx = st.session_state["current_phrase_idx"]
+                if curr_idx < len(phrases_data):
+                    p = phrases_data[curr_idx]
+                    target = p.get("spanish", "")
+                    
+                    audio_bytes = get_audio_bytes(target, rate_str=selected_rate)
+                    if audio_bytes:
+                        audio_duration = len(audio_bytes) / 6000.0
+                        thinking_time = (pause_duration * 0.5) if reverse_recall else 0
+                        post_audio_pause = pause_duration - thinking_time if reverse_recall else pause_duration
+
+                        if thinking_time > 0:
+                            time.sleep(thinking_time)
+                        
+                        for rep in range(repetitions):
+                            play_audio_silently(audio_bytes)
+                            time.sleep(audio_duration)
+                            if post_audio_pause > 0 and rep < repetitions - 1:
                                 time.sleep(post_audio_pause)
                         
-                        if st.session_state["current_phrase_idx"] < len(phrases_data) - 1:
-                            st.session_state["current_phrase_idx"] += 1
-                            st.rerun()
-                        else:
-                            st.session_state["drill_active"] = False
-                            st.success("🎉 Drill completed!")
-                            st.rerun()
-                else:
-                    st.session_state["drill_active"] = False
+                        if post_audio_pause > 0:
+                            time.sleep(post_audio_pause)
+                    
+                    if st.session_state["current_phrase_idx"] < len(phrases_data) - 1:
+                        st.session_state["current_phrase_idx"] += 1
+                        st.rerun()
+                    else:
+                        st.session_state["drill_active"] = False
+                        st.success("🎉 Drill completed!")
+                        st.rerun()
 
             st.divider()
             
-            # Phrase List Preview (collapsed/condensed preview view)
+            # Phrase List Preview
             with st.expander(f"📋 Phrase List ({len(phrases_data)} items)"):
                 for idx, p in enumerate(phrases_data, 1):
                     target = p.get("spanish", "")
@@ -417,5 +422,3 @@ with tab_paste:
             st.warning("Please enter phrase pairs.")
         else:
             sep = "|" if "|" in separator_choice else ("," if "," in separator_choice else "\t")
-            lines = [line.strip() for line in raw_text.split("\n") if line.strip()]
-            supabase.table("decks").upsert({"name": deck_title}).exec
