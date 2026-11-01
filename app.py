@@ -208,40 +208,48 @@ with tab_practice:
 
             st.divider()
             
-            # Practice Settings
-            st.subheader("⚙️ Practice Settings")
-            c1, c2, c3, c4 = st.columns(4)
+            # Toggle expander state for practice settings cleanly
+            settings_open = st.toggle("⚙️ Practice Settings", value=False, key="toggle_settings")
             
-            with c1:
-                speed_choice = st.selectbox(
-                    "Speech Speed",
-                    ["Normal", "Slow", "Slower", "Slowest", "Faster"],
-                    index=0,
-                    key="setting_speed"
-                )
-                rate_mapping = {
-                    "Normal": "+0%",
-                    "Slow": "-20%",
-                    "Slower": "-30%",
-                    "Slowest": "-40%",
-                    "Faster": "+15%"
-                }
-                selected_rate = rate_mapping[speed_choice]
+            if settings_open:
+                c1, c2, c3, c4 = st.columns(4)
                 
-            with c2:
-                repetitions = st.number_input("Repetitions per phrase", min_value=1, max_value=5, value=1, key="setting_reps")
-                
-            with c3:
-                pause_duration = st.number_input("Pause between phrases (s) Longer phrases? Choose a longer pause", 1.0, 10.0, 2.0, 0.5, key="setting_pause")
-                
-            with c4:
-                reverse_recall = st.checkbox("Reverse Recall (Show EN, play ES)", value=False, key="setting_reverse")
-                show_translation = st.checkbox("Show Translations", value=True, key="setting_show_trans")
+                with c1:
+                    speed_choice = st.selectbox(
+                        "Speech Speed",
+                        ["Normal", "Slow", "Slower", "Slowest", "Faster"],
+                        index=0,
+                        key="setting_speed"
+                    )
+                with c2:
+                    repetitions = st.number_input("Repetitions per phrase", min_value=1, max_value=5, value=1, key="setting_reps")
+                with c3:
+                    pause_duration = st.number_input("Pause between phrases (s) Longer phrases? Choose a longer pause", 1.0, 10.0, 2.0, 0.5, key="setting_pause")
+                with c4:
+                    reverse_recall = st.checkbox("Reverse Recall (Show EN, play ES)", value=False, key="setting_reverse")
+                    show_translation = st.checkbox("Show Translations", value=True, key="setting_show_trans")
+            else:
+                # Fallback values when settings panel is collapsed so the app never throws an undefined variable error
+                speed_choice = st.session_state.get("setting_speed", "Normal")
+                repetitions = st.session_state.get("setting_reps", 1)
+                pause_duration = st.session_state.get("setting_pause", 2.0)
+                reverse_recall = st.session_state.get("setting_reverse", False)
+                show_translation = st.session_state.get("setting_show_trans", True)
+
+            rate_mapping = {
+                "Normal": "+0%",
+                "Slow": "-20%",
+                "Slower": "-30%",
+                "Slowest": "-40%",
+                "Faster": "+15%"
+            }
+            selected_rate = rate_mapping[speed_choice]
             
             st.divider()
             
             # Global Drill Controls
             st.subheader("🎧 List Player")
+
             
             col_p1, col_p2, col_p3 = st.columns([2, 2, 2])
             with col_p1:
