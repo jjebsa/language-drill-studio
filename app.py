@@ -122,7 +122,7 @@ def inject_drill_helpers(is_active):
 # --- DIALOG: DELETE CONFIRMATION ---
 @st.dialog("Confirm Deck Deletion")
 def confirm_delete_dialog(deck_name):
-    st.write(f"Are you sure you want to delete the deck **'{deck_name}'**?")
+    st.write(f"Are you sure you want to delete the selected deck **'{deck_name}'**?")
     st.caption("This action will permanently delete all associated phrases.")
     c_cancel, c_confirm = st.columns(2)
     with c_cancel:
@@ -425,4 +425,4 @@ with tab_upload:
                             success_count += 1
                         
                         st.success(f"Successfully saved deck '{deck_title_input}' with {success_count} phrases!")
-                        
+               
