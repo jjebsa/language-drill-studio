@@ -379,7 +379,7 @@ with tab_upload:
 # TAB 3: TYPE or PASTE PHRASES
 # ==========================================
 with tab_paste:
-    st.markdown("### Type or Paste Words or Phrases")
+    st.markdown("### Type or Paste Words and Phrases")
     st.caption("You can enter multiple pairs here. Be sure to use separation symbols: pipe (`|`) or comma. Optionally, enter one line, then *SAVE DECK*, then add more lines under *EDIT DECK* in the *PRACTICE STUDIO*. May be easier if typing rather than pasting.") 
     
     raw_text = st.text_area(
