@@ -425,6 +425,7 @@ with tab_paste:
         "Enter your Phrase or Word Pairs", 
         placeholder="Hola | Hello\n¿Cómo estás? , How are you?", 
         height=150
+        key="paste_raw_text"
     )
     deck_title = st.text_input("Enter a Name for your New Deck and click Save Deck", placeholder="My Deck Name", key="paste_deck_title")
     
