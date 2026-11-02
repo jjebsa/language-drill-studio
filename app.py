@@ -343,7 +343,9 @@ with tab_practice:
 # ==========================================
 with tab_upload:
     st.markdown("### Upload Bilingual Phrase File")
-    uploaded_file = st.file_uploader("Choose CSV, TSV, or TXT file", type=["csv", "tsv", "txt"])
+    
+    # Use session state keys to manage clearing input fields cleanly
+    uploaded_file = st.file_uploader("Choose CSV, TSV, or TXT file", type=["csv", "tsv", "txt"], key="upload_file_widget")
     deck_title_input = st.text_input("New Deck Name:", placeholder="Imported Deck", key="upload_deck_title")
     
     if uploaded_file is not None:
@@ -351,7 +353,6 @@ with tab_upload:
             content = uploaded_file.getvalue().decode("utf-8", errors="ignore")
             first_lines = "\n".join(content.splitlines()[:5])
             
-            # Intelligent delimiter sniffing (prioritizes semicolon, tab, pipe, then comma)
             sep = ","
             if ";" in first_lines and first_lines.count(";") >= first_lines.count(","):
                 sep = ";"
@@ -363,7 +364,6 @@ with tab_upload:
             import io
             df = pd.read_csv(io.StringIO(content), sep=sep)
             
-            # Fallback check if it collapsed into a single column
             if len(df.columns) == 1:
                 for alt_sep in [",", ";", "\t", "|"]:
                     df_test = pd.read_csv(io.StringIO(content), sep=alt_sep)
@@ -399,10 +399,14 @@ with tab_upload:
                                 success_count += 1
                         
                         st.success(f"Saved '{deck_title_input}' ({success_count} phrases)!")
+                        
+                        # Clear state keys so fields wipe clean on rerun
+                        st.session_state["upload_deck_title"] = ""
+                        time.sleep(0.8) # Brief pause so success message is visible
                         st.rerun()
         except Exception as e:
             st.error(f"Error parsing file: {e}")
-
+            
 # ==========================================
 # TAB 3: TYPE or PASTE PHRASES
 # ==========================================
