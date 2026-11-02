@@ -384,7 +384,7 @@ with tab_paste:
     st.caption("Optionally, enter one line, then *SAVE DECK*, then add more lines under *EDIT DECK* in the *PRACTICE STUDIO*. May be easier if typing rather than pasting.")
 
     raw_text = st.text_area(
-        "Phrase or Word Pairs", 
+        "Enter your Phrase or Word Pairs", 
         placeholder="Hola | Hello\n¿Cómo estás? , How are you?", 
         height=150
     )
