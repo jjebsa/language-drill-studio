@@ -343,12 +343,36 @@ with tab_practice:
 # ==========================================
 with tab_upload:
     st.markdown("### Upload Bilingual Phrase File")
-    uploaded_file = st.file_uploader("Choose CSV or TSV file", type=["csv", "tsv", "txt"])
-    deck_title_input = st.text_input("New Deck Name:", placeholder="Imported Deck")
+    uploaded_file = st.file_uploader("Choose CSV, TSV, or TXT file", type=["csv", "tsv", "txt"])
+    deck_title_input = st.text_input("New Deck Name:", placeholder="Imported Deck", key="upload_deck_title")
     
     if uploaded_file is not None:
         try:
-            df = pd.read_csv(uploaded_file, sep=None, engine='python')
+            content = uploaded_file.getvalue().decode("utf-8", errors="ignore")
+            first_lines = "\n".join(content.splitlines()[:5])
+            
+            # Intelligent delimiter sniffing (prioritizes semicolon, tab, pipe, then comma)
+            sep = ","
+            if ";" in first_lines and first_lines.count(";") >= first_lines.count(","):
+                sep = ";"
+            elif "\t" in first_lines:
+                sep = "\t"
+            elif "|" in first_lines:
+                sep = "|"
+            
+            import io
+            df = pd.read_csv(io.StringIO(content), sep=sep)
+            
+            # Fallback check if it collapsed into a single column
+            if len(df.columns) == 1:
+                for alt_sep in [",", ";", "\t", "|"]:
+                    df_test = pd.read_csv(io.StringIO(content), sep=alt_sep)
+                    if len(df_test.columns) > 1:
+                        df = df_test
+                        sep = alt_sep
+                        break
+            
+            st.write(f"File preview (Detected separator: `{repr(sep)}`):")
             st.dataframe(df.head(3), height=150)
             
             if st.button("Save Deck to Supabase", type="primary"):
@@ -356,19 +380,23 @@ with tab_upload:
                     st.warning("Please enter a valid Deck Name.")
                 else:
                     with st.spinner("Saving..."):
-                        supabase.table("decks").upsert({"name": deck_title_input}).execute()
-                        cols = {c.lower(): c for c in df.columns}
-                        col_es = cols.get('spanish', df.columns[0] if len(df.columns) > 0 else None)
-                        col_en = cols.get('english', df.columns[1] if len(df.columns) > 1 else col_es)
+                        supabase.table("decks").upsert({"name": deck_title_input.strip()}).execute()
+                        cols = {str(c).lower().strip(): c for c in df.columns}
+                        
+                        col_es = cols.get('spanish', cols.get('es', df.columns[0] if len(df.columns) > 0 else None))
+                        col_en = cols.get('english', cols.get('en', df.columns[1] if len(df.columns) > 1 else col_es))
                         
                         success_count = 0
                         for _, row in df.iterrows():
-                            supabase.table("phrases").insert({
-                                "deck_name": deck_title_input,
-                                "spanish": str(row[col_es]) if col_es else "",
-                                "english": str(row[col_en]) if col_en else ""
-                            }).execute()
-                            success_count += 1
+                            spanish_val = str(row[col_es]).strip() if col_es and pd.notna(row[col_es]) else ""
+                            english_val = str(row[col_en]).strip() if col_en and pd.notna(row[col_en]) else ""
+                            if spanish_val and spanish_val != "nan":
+                                supabase.table("phrases").insert({
+                                    "deck_name": deck_title_input.strip(),
+                                    "spanish": spanish_val,
+                                    "english": english_val
+                                }).execute()
+                                success_count += 1
                         
                         st.success(f"Saved '{deck_title_input}' ({success_count} phrases)!")
                         st.rerun()
