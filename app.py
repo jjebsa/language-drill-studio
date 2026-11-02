@@ -406,11 +406,17 @@ with tab_upload:
                         st.rerun()
         except Exception as e:
             st.error(f"Error parsing file: {e}")
-            
+
 # ==========================================
 # TAB 3: TYPE or PASTE PHRASES
 # ==========================================
 with tab_paste:
+    # --- ADD THIS RESET CHECK HERE ---
+    if st.session_state.get("clear_paste_form", False):
+        st.session_state["paste_raw_text"] = ""
+        st.session_state["paste_deck_title"] = ""
+        st.session_state["clear_paste_form"] = False
+    # ---------------------------------
     st.markdown("### Type or Paste Words and Phrases")
     st.caption("##### You can enter multiple pairs here. Be sure to use the separation symbols between your target language and its translation, either pipe (`|`) or comma. (see examples below)") 
     st.caption("Optionally, enter one pair, then *SAVE DECK*, then add more lines under *EDIT DECK* in the *PRACTICE STUDIO*. May be easier if typing rather than pasting.")
@@ -457,4 +463,6 @@ with tab_paste:
                 }).execute()
             
             st.success(f"Saved deck '{deck_title}' with {len(lines)} phrases!")
+            st.session_state["clear_paste_form"] = True
+            time.sleep(0.8)
             st.rerun()
