@@ -191,7 +191,7 @@ with tab_practice:
                 if st.button("🗑️ Delete Selected Deck", type="secondary"):
                     confirm_delete_dialog(selected_deck)
 
-            settings_open = st.toggle("⚙️ Practice Settings Select Voice Speed, Repetions per Pair, Length of Pause between Pairs, Show Translation, Switch to Recall Mode", value=False, key="toggle_settings")
+            settings_open = st.toggle("⚙️ PRACTICE SETTINGS:  Select Voice Speed,  Repetions per Pair,  Length of Pause between Pairs,  Show Translation,  Switch to Recall Mode", value=False, key="toggle_settings")
             
             if settings_open:
                 c1, c2, c3, c4 = st.columns(4)
