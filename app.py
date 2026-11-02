@@ -381,7 +381,7 @@ with tab_upload:
 with tab_paste:
     st.markdown("### Type or Paste Words and Phrases")
     st.caption("##### You can enter multiple pairs here. Be sure to use the separation symbols between your target language and its translation, either pipe (`|`) or comma. (see examples below)") 
-    st.caption("Optionally, enter one line, then *SAVE DECK*, then add more lines under *EDIT DECK* in the *PRACTICE STUDIO*. May be easier if typing rather than pasting.")
+    st.caption("Optionally, enter one pair, then *SAVE DECK*, then add more lines under *EDIT DECK* in the *PRACTICE STUDIO*. May be easier if typing rather than pasting.")
 
     raw_text = st.text_area(
         "Enter your Phrase or Word Pairs", 
