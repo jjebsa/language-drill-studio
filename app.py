@@ -380,7 +380,7 @@ with tab_upload:
 # ==========================================
 with tab_paste:
     st.markdown("### Type or Paste Words or Phrases")
-    st.caption("Enter pairs using separation symbols: pipe (`|`) or comma. (example:*Hola | Hello*) Optionally, enter one line, *SAVE DECK*, then add lines under Edit Deck in the Practice Studio. ") 
+    st.caption("Enter pairs using separation symbols: pipe (`|`) or comma. (example:***Hola | Hello***) Optionally, enter one line, then *SAVE DECK*, then add lines under *EDIT DECK* in the *PRACTICE STUDIO*. ") 
     
     raw_text = st.text_area(
         "Phrase or Word pairs:", 
