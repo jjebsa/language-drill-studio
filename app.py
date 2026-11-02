@@ -379,15 +379,15 @@ with tab_upload:
 # TAB 3: TYPE / PASTE PHRASES
 # ==========================================
 with tab_paste:
-    st.markdown("### Type or Paste your Words or Phrases")
-    raw_text = st.text_area("Phrase or Word Pairs with Separator (Format: Spanish | English):", placeholder="Examples: Hola | Hello\n¿Cómo estás? | How are you?", height=120)
-    deck_title = st.text_input("Give Your New Deck/List a Title:", placeholder="Example: My Deck", key="paste_deck_title")
-        
+    st.markdown("### Type or Paste Phrases")
+    raw_text = st.text_area("Phrase pairs (Format: Spanish | English):", placeholder="Hola | Hello\n¿Cómo estás? | How are you?", height=120)
+    deck_title = st.text_input("New Deck Title:", placeholder="My Deck", key="paste_deck_title")
+       
     if st.button("Process & Save Deck", type="primary"):
         if not raw_text.strip():
             st.warning("Please enter phrase pairs.")
+            
         else:
-            sep = "|" if "|" in separator_choice else ("," if "," in separator_choice else "\t")
             lines = [line.strip() for line in raw_text.split("\n") if line.strip()]
             supabase.table("decks").upsert({"name": deck_title}).execute()
             
