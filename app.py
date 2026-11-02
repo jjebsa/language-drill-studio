@@ -386,16 +386,12 @@ with tab_paste:
     if st.button("Process & Save Deck", type="primary"):
         if not raw_text.strip():
             st.warning("Please enter phrase pairs.")
-            
+
         else:
             lines = [line.strip() for line in raw_text.split("\n") if line.strip()]
             supabase.table("decks").upsert({"name": deck_title}).execute()
             
-            for line in lines:
-                if sep in line:
-                    parts = line.split(sep, 1)
-                    spanish_text, english_text = parts[0].strip(), parts[1].strip()
-                else:
+                    else:
                     spanish_text, english_text = line, line
                 
                 supabase.table("phrases").insert({
