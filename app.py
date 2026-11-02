@@ -149,7 +149,7 @@ with tab_practice:
                 phrases_data = []
                 st.error(f"Error loading phrases for deck '{selected_deck}': {e}")
             
-            with st.expander("✏️ Click to Edit Deck:  Rename, add pairs, delete deck."):
+            with st.expander("✏️ Click to Edit Deck:  Rename Deck, Add/Edit Phrases, delete deck."):
                 new_deck_name = st.text_input("Rename Deck", value=selected_deck, key=f"rename_deck_input_{selected_deck}")
                 if st.button("Update Deck Name", key=f"update_deck_btn_{selected_deck}"):
                     if new_deck_name and new_deck_name != selected_deck:
