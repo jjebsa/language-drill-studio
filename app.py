@@ -379,31 +379,49 @@ with tab_upload:
 # TAB 3: TYPE / PASTE PHRASES
 # ==========================================
 with tab_paste:
-    st.markdown("### Type or Paste your Words or Phrases")
-    raw_text = st.text_area("Phrase or Word Pairs with Separator (Format: Spanish | English):", placeholder="Examples: Hola | Hello\n¿Cómo estás? | How are you?", height=120)
-    deck_title = st.text_input("Give Your New Deck/List a Title:", placeholder="Example: My Deck", key="paste_deck_title")
-    separator_choice = st.selectbox("Choose Which Divider You Used   :", ["| (Pipe)", ", (Comma)"], key="paste_delimiter")
+    st.markdown("### Type or Paste Phrases")
+    st.caption("Enter pairs separated by pipe (`|`), tab, or comma. (e.g., *Hola | Hello*)")
+    
+    raw_text = st.text_area(
+        "Phrase pairs:", 
+        placeholder="Hola | Hello\n¿Cómo estás? | How are you?", 
+        height=150
+    )
+    deck_title = st.text_input("New Deck Title:", placeholder="My Deck Name", key="paste_deck_title")
     
     if st.button("Process & Save Deck", type="primary"):
         if not raw_text.strip():
             st.warning("Please enter phrase pairs.")
+        elif not deck_title.strip():
+            st.warning("Please enter a deck title.")
         else:
-            sep = "|" if "|" in separator_choice else ("," if "," in separator_choice else "\t")
             lines = [line.strip() for line in raw_text.split("\n") if line.strip()]
-            supabase.table("decks").upsert({"name": deck_title}).execute()
+            supabase.table("decks").upsert({"name": deck_title.strip()}).execute()
             
             for line in lines:
-                if sep in line:
-                    parts = line.split(sep, 1)
-                    spanish_text, english_text = parts[0].strip(), parts[1].strip()
+                # 1. Check for Pipe
+                if "|" in line:
+                    parts = line.split("|", 1)
+                # 2. Check for Tab (clipboard paste or literal '\t')
+                elif "\t" in line:
+                    parts = line.split("\t", 1)
+                elif "\\t" in line:
+                    parts = line.split("\\t", 1)
+                # 3. Check for Comma (splits only on the FIRST comma)
+                elif "," in line:
+                    parts = line.split(",", 1)
+                # Fallback: No delimiter found
                 else:
-                    spanish_text, english_text = line, line
+                    parts = [line, line]
+                
+                spanish_text = parts[0].strip()
+                english_text = parts[1].strip() if len(parts) > 1 else spanish_text
                 
                 supabase.table("phrases").insert({
-                    "deck_name": deck_title,
+                    "deck_name": deck_title.strip(),
                     "spanish": spanish_text,
                     "english": english_text
                 }).execute()
             
-            st.success(f"Saved deck '{deck_title}'!")
+            st.success(f"Saved deck '{deck_title}' with {len(lines)} phrases!")
             st.rerun()
