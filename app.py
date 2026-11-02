@@ -380,10 +380,9 @@ with tab_upload:
 # ==========================================
 with tab_paste:
     st.markdown("### Type or Paste your Words or Phrases")
-    raw_text = st.text_area("Phrase or Word Pairs (Format: Spanish | English):", placeholder="Example: Hola | Hello\n¿Cómo estás? | How are you?", height=120)
-    deck_title = st.text_input("Give Your New Deck a Title:", placeholder="Example: My Deck", key="paste_deck_title")
-    separator_choice = st.selectbox("Choose Divider between Target Lanuage & English:", ["| (Pipe)", ", (Comma)"], key="paste_delimiter")
-    
+    raw_text = st.text_area("Phrase or Word Pairs with Separator (Format: Spanish | English):", placeholder="Examples: Hola | Hello\n¿Cómo estás? | How are you?", height=120)
+    deck_title = st.text_input("Give Your New Deck/List a Title:", placeholder="Example: My Deck", key="paste_deck_title")
+        
     if st.button("Process & Save Deck", type="primary"):
         if not raw_text.strip():
             st.warning("Please enter phrase pairs.")
