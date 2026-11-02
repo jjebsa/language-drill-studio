@@ -413,9 +413,9 @@ with tab_upload:
 with tab_paste:
     # --- ADD THIS RESET CHECK HERE ---
     if st.session_state.get("clear_paste_form", False):
-        st.session_state["paste_raw_text"] = ""
-        st.session_state["paste_deck_title"] = ""
-        st.session_state["clear_paste_form"] = False
+       st.session_state["paste_raw_text"] = ""
+       st.session_state["paste_deck_title"] = ""
+       st.session_state["clear_paste_form"] = False
     # ---------------------------------
     st.markdown("### Type or Paste Words and Phrases")
     st.caption("##### You can enter multiple pairs here. Be sure to use the separation symbols between your target language and its translation, either pipe (`|`) or comma. (see examples below)") 
