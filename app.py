@@ -391,10 +391,9 @@ with tab_paste:
             lines = [line.strip() for line in raw_text.split("\n") if line.strip()]
             supabase.table("decks").upsert({"name": deck_title}).execute()
             
-                    else:
-                    spanish_text, english_text = line, line
-                
-                supabase.table("phrases").insert({
+    else:   
+            spanish_text, english_text = line, line
+            supabase.table("phrases").insert({
                     "deck_name": deck_title,
                     "spanish": spanish_text,
                     "english": english_text
