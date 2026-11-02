@@ -383,13 +383,13 @@ with tab_paste:
     st.caption("You can enter multiple pairs here. Be sure to use separation symbols: pipe (`|`) or comma. Optionally, enter one line, then *SAVE DECK*, then add more lines under *EDIT DECK* in the *PRACTICE STUDIO*. May be easier if typing rather than pasting.") 
     
     raw_text = st.text_area(
-        "Phrase or Word pairs:", 
-        placeholder="Hola | Hello \n ¿Cómo estás? , How are you?", 
+        "Phrase or Word Pairs", 
+        placeholder="Hola | Hello\n¿Cómo estás? , How are you?", 
         height=150
     )
-    deck_title = st.text_input("New Deck Title:", placeholder="My Deck Name", key="paste_deck_title")
+    deck_title = st.text_input("Enter a Name for your New Deck and click Save Deck:", placeholder="My Deck Name", key="paste_deck_title")
     
-    if st.button("Process & Save Deck", type="primary"):
+    if st.button("Save Deck", type="primary"):
         if not raw_text.strip():
             st.warning("Please enter phrase pairs.")
         elif not deck_title.strip():
