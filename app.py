@@ -387,7 +387,7 @@ with tab_paste:
         placeholder="Hola | Hello\n¿Cómo estás? , How are you?", 
         height=150
     )
-    deck_title = st.text_input("Enter a Name for your New Deck and click Save Deck:", placeholder="My Deck Name", key="paste_deck_title")
+    deck_title = st.text_input("Enter a Name for your New Deck and click Save Deck", placeholder="My Deck Name", key="paste_deck_title")
     
     if st.button("Save Deck", type="primary"):
         if not raw_text.strip():
