@@ -379,11 +379,11 @@ with tab_upload:
 # TAB 3: TYPE / PASTE PHRASES
 # ==========================================
 with tab_paste:
-    st.markdown("### Type or Paste Phrases")
-    st.caption("Enter pairs separated by pipe (`|`), tab, or comma. (e.g., *Hola | Hello*)")
+    st.markdown("### Type or Paste Words or Phrases")
+    st.caption("Enter pairs using separation symbols: pipe (`|`) or comma. (example:*Hola | Hello*) Optionally, enter one line, Save Deck, then add lines under Edit Deck in the Practice Studio. ") 
     
     raw_text = st.text_area(
-        "Phrase pairs:", 
+        "Phrase or Word pairs:", 
         placeholder="Hola | Hello\n¿Cómo estás? | How are you?", 
         height=150
     )
