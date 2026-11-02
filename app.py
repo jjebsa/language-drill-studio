@@ -198,7 +198,7 @@ with tab_practice:
                 with c1:
                     speed_choice = st.selectbox("Speed", ["Normal", "Slow", "Slower", "Slowest", "Faster"], index=0, key="setting_speed")
                 with c2:
-                    repetitions = st.selectbox("Reps", min_value=1, max_value=5, value=1, key="setting_reps")
+                    repetitions = st.number_input("Reps", min_value=1, max_value=5, value=1, key="setting_reps")
                 with c3:
                     pause_duration = st.number_input("Pause (s)", 1.0, 10.0, 2.0, 0.5, key="setting_pause")
                 with c4:
