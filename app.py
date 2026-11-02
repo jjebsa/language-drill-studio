@@ -138,6 +138,7 @@ with tab_practice:
         with top_col1:
             st.markdown("### 🗣️ Practice Studio")
         with top_col2:
+            st.caption("Select your Phrase Deck to practice")
             selected_deck = st.selectbox("Select Deck:", deck_names, key="active_deck_select", label_visibility="collapsed")
 
         if selected_deck:
@@ -148,7 +149,7 @@ with tab_practice:
                 phrases_data = []
                 st.error(f"Error loading phrases for deck '{selected_deck}': {e}")
             
-            with st.expander("✏️ Edit Deck & Phrases"):
+            with st.expander("✏️ Click to Edit Deck:Rename, add pairs, delete deck."):
                 new_deck_name = st.text_input("Rename Deck", value=selected_deck, key=f"rename_deck_input_{selected_deck}")
                 if st.button("Update Deck Name", key=f"update_deck_btn_{selected_deck}"):
                     if new_deck_name and new_deck_name != selected_deck:
@@ -318,7 +319,7 @@ with tab_practice:
 
             st.divider()
             
-            with st.expander(f"📋 Phrase List ({len(phrases_data)} items)"):
+            with st.expander(f"📋 Click to view Phrase List ({len(phrases_data)} items)"):
                 for idx, p in enumerate(phrases_data, 1):
                     target = p.get("spanish", "")
                     translation = p.get("english", "")
