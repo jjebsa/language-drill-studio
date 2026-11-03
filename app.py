@@ -139,8 +139,7 @@ with tab_practice:
             st.markdown("### 🗣️ Practice Studio")
             st.markdown("Listen and Repeat, Shadowing, Active Recall")
             video_id = "43IrHhD8biA"
-            thumbnail_url = f"https://img.youtube.com/vi/{video_id}/hqdefault.jpg"
-
+           
             html_content = f"""
             <div style="text-align: center; margin: 10px 0;">
                 <a href="https://www.youtube.com/watch?v={video_id}" target="_blank">
