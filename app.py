@@ -105,18 +105,6 @@ def confirm_delete_dialog(deck_name):
             st.toast(f"Deleted deck '{deck_name}'")
             st.rerun()
 
-# --- INITIALIZE SESSION STATE FOR DEFAULTS ---
-defaults = {
-    "setting_speed": "Normal",
-    "setting_reps": 1,
-    "setting_pause": 2.0,
-    "setting_reverse": False,
-    "setting_show_trans": True
-}
-for key, val in defaults.items():
-    if key not in st.session_state:
-        st.session_state[key] = val
-
 # --- INITIALIZE SESSION STATE FOR DRILL RUNNER ---
 if "drill_active" not in st.session_state:
     st.session_state["drill_active"] = False
@@ -127,7 +115,7 @@ if "current_phrase_idx" not in st.session_state:
 
 # --- PROMINENT TOP-LEVEL TABS ---
 tab_practice, tab_upload, tab_paste = st.tabs([
-    "🗣️ Practice Studio",
+    "📚 Practice Studio",
     "📁 Upload File",
     "✍️ Type / Paste"
 ])
@@ -149,9 +137,7 @@ with tab_practice:
         top_col1, top_col2 = st.columns([1.5, 2.5])
         with top_col1:
             st.markdown("### 🗣️ Practice Studio")
-            st.markdown("Listen and Repeat, Shadowing, Active Recall")
         with top_col2:
-            st.caption("#### Select a Deck to Practice ↴")
             selected_deck = st.selectbox("Select Deck:", deck_names, key="active_deck_select", label_visibility="collapsed")
 
         if selected_deck:
@@ -162,7 +148,7 @@ with tab_practice:
                 phrases_data = []
                 st.error(f"Error loading phrases for deck '{selected_deck}': {e}")
             
-            with st.expander("✏️ Click to Edit Deck:  Rename Deck, Add/Edit Phrases, delete deck."):
+            with st.expander("✏️ Edit Deck & Phrases"):
                 new_deck_name = st.text_input("Rename Deck", value=selected_deck, key=f"rename_deck_input_{selected_deck}")
                 if st.button("Update Deck Name", key=f"update_deck_btn_{selected_deck}"):
                     if new_deck_name and new_deck_name != selected_deck:
@@ -204,29 +190,25 @@ with tab_practice:
                 if st.button("🗑️ Delete Selected Deck", type="secondary"):
                     confirm_delete_dialog(selected_deck)
 
-             
-            settings_open = st.toggle("⚙️ SETTINGS: Voice Speed, Repetions per Pair, Pause Between Pairs, Show Translation, Select Recall Mode", value=False, key="toggle_settings")         
+            settings_open = st.toggle("⚙️ Practice Settings", value=False, key="toggle_settings")
             
-            # Always display settings controls if toggled open, but let session_state maintain values globally
             if settings_open:
                 c1, c2, c3, c4 = st.columns(4)
                 with c1:
-                    speed_choice = st.selectbox("Speed", ["Normal", "Slow", "Slower", "Slowest", "Faster"], key="setting_speed")
+                    speed_choice = st.selectbox("Speed", ["Normal", "Slow", "Slower", "Slowest", "Faster"], index=0, key="setting_speed")
                 with c2:
-                    repetitions = st.number_input("Reps", min_value=1, max_value=5, key="setting_reps")
+                    repetitions = st.number_input("Reps", min_value=1, max_value=5, value=1, key="setting_reps")
                 with c3:
-                    pause_duration = st.number_input("Pause (s)", 1.0, 10.0, 0.5, key="setting_pause")
+                    pause_duration = st.number_input("Pause (s)", 1.0, 10.0, 2.0, 0.5, key="setting_pause")
                 with c4:
-                    reverse_recall = st.checkbox("Reverse Language Recall Mode", key="setting_reverse")
-                    show_translation = st.checkbox("Show Translation Off/On", key="setting_show_trans")
+                    reverse_recall = st.checkbox("Reverse (EN->ES)", value=False, key="setting_reverse")
+                    show_translation = st.checkbox("Translations", value=True, key="setting_show_trans")
             else:
-                # Pull directly from session state variables bound to the widget keys above
-                speed_choice = st.session_state["setting_speed"]
-                repetitions = st.session_state["setting_reps"]
-                pause_duration = st.session_state["setting_pause"]
-                reverse_recall = st.session_state["setting_reverse"]
-                show_translation = st.session_state["setting_show_trans"]
-
+                speed_choice = st.session_state.get("setting_speed", "Normal")
+                repetitions = st.session_state.get("setting_reps", 1)
+                pause_duration = st.session_state.get("setting_pause", 2.0)
+                reverse_recall = st.session_state.get("setting_reverse", False)
+                show_translation = st.session_state.get("setting_show_trans", True)
 
             rate_mapping = {
                 "Normal": "+0%",
@@ -255,12 +237,12 @@ with tab_practice:
                     border_color = "#ffc107" if st.session_state["drill_paused"] else "#30363d"
                     status_badge = " <span style='color:#ffc107; font-size:0.8rem;'>(PAUSED)</span>" if st.session_state["drill_paused"] else ""
                     
-                    # Direct DIV rendering prevents Streamlit H2 CSS overrides
+                    # Adjusted container height & smaller font to prevent text overflow
                     st.markdown(f"""
-                    <div style="min-height: 190px; display: flex; align-items: center; justify-content: center; background-color: #0d1117; border-radius: 8px; border: 1px solid {border_color}; margin: 5px 0; padding: 12px 16px;">
-                        <div style="text-align: center; width: 100%;">
-                            <div style="color: #ffffff; font-size: 1.15rem; font-weight: 600; line-height: 1.3; margin-bottom: 8px;">{main_text}{status_badge}</div>
-                            <div style="color: #8b949e; font-size: 0.9rem; font-weight: 400; margin: 0;">{sub_text}</div>
+                    <div style="min-height: 200px; display: flex; align-items: center; justify-content: center; background-color: #0d1117; border-radius: 8px; border: 1px solid {border_color}; margin: 5px 0; padding: 15px;">
+                        <div style="text-align: center;">
+                            <h2 style="color: #ffffff; font-size: 1.3rem !important; line-height: 1.4 !important; margin: 0 0 8px 0 !important;">{main_text}{status_badge}</h2>
+                            <h4 style="color: #8b949e; font-size: 0.95rem; font-weight: 400; margin: 0;">{sub_text}</h4>
                         </div>
                     </div>
                     """, unsafe_allow_html=True)
@@ -336,7 +318,7 @@ with tab_practice:
 
             st.divider()
             
-            with st.expander(f"📋 Click to view Phrase List and play Individual Phrases ({len(phrases_data)} items)"):
+            with st.expander(f"📋 Phrase List ({len(phrases_data)} items)"):
                 for idx, p in enumerate(phrases_data, 1):
                     target = p.get("spanish", "")
                     translation = p.get("english", "")
@@ -360,37 +342,13 @@ with tab_practice:
 # TAB 2: UPLOAD CSV / TSV FILE
 # ==========================================
 with tab_upload:
-    st.markdown("### 📁 Upload Bilingual Phrase File")
-    
-    # Use session state keys to manage clearing input fields cleanly
-    uploaded_file = st.file_uploader("Choose a premade .CSV, .TSV, or .TXT file from your device.  Two columns: target language 1st, translation 2nd. Separated by pipe ( | ), comma, or tab", type=["csv", "tsv", "txt"], key="upload_file_widget")
-    deck_title_input = st.text_input("Enter a Name for your New Deck", placeholder="Imported Deck", key="upload_deck_title")
+    st.markdown("### Upload Bilingual Phrase File")
+    uploaded_file = st.file_uploader("Choose CSV or TSV file", type=["csv", "tsv", "txt"])
+    deck_title_input = st.text_input("New Deck Name:", placeholder="Imported Deck")
     
     if uploaded_file is not None:
         try:
-            content = uploaded_file.getvalue().decode("utf-8", errors="ignore")
-            first_lines = "\n".join(content.splitlines()[:5])
-            
-            sep = ","
-            if ";" in first_lines and first_lines.count(";") >= first_lines.count(","):
-                sep = ";"
-            elif "\t" in first_lines:
-                sep = "\t"
-            elif "|" in first_lines:
-                sep = "|"
-            
-            import io
-            df = pd.read_csv(io.StringIO(content), sep=sep)
-            
-            if len(df.columns) == 1:
-                for alt_sep in [",", ";", "\t", "|"]:
-                    df_test = pd.read_csv(io.StringIO(content), sep=alt_sep)
-                    if len(df_test.columns) > 1:
-                        df = df_test
-                        sep = alt_sep
-                        break
-            
-            st.write(f"File preview (Detected separator: `{repr(sep)}`):")
+            df = pd.read_csv(uploaded_file, sep=None, engine='python')
             st.dataframe(df.head(3), height=150)
             
             if st.button("Save Deck to Supabase", type="primary"):
@@ -398,22 +356,54 @@ with tab_upload:
                     st.warning("Please enter a valid Deck Name.")
                 else:
                     with st.spinner("Saving..."):
-                        supabase.table("decks").upsert({"name": deck_title_input.strip()}).execute()
-                        cols = {str(c).lower().strip(): c for c in df.columns}
-                        
-                        col_es = cols.get('spanish', cols.get('es', df.columns[0] if len(df.columns) > 0 else None))
-                        col_en = cols.get('english', cols.get('en', df.columns[1] if len(df.columns) > 1 else col_es))
+                        supabase.table("decks").upsert({"name": deck_title_input}).execute()
+                        cols = {c.lower(): c for c in df.columns}
+                        col_es = cols.get('spanish', df.columns[0] if len(df.columns) > 0 else None)
+                        col_en = cols.get('english', df.columns[1] if len(df.columns) > 1 else col_es)
                         
                         success_count = 0
                         for _, row in df.iterrows():
-                            spanish_val = str(row[col_es]).strip() if col_es and pd.notna(row[col_es]) else ""
-                            english_val = str(row[col_en]).strip() if col_en and pd.notna(row[col_en]) else ""
-                            if spanish_val and spanish_val != "nan":
-                                supabase.table("phrases").insert({
-                                    "deck_name": deck_title_input.strip(),
-                                    "spanish": spanish_val,
-                                    "english": english_val
-                                }).execute()
-                                success_count += 1
+                            supabase.table("phrases").insert({
+                                "deck_name": deck_title_input,
+                                "spanish": str(row[col_es]) if col_es else "",
+                                "english": str(row[col_en]) if col_en else ""
+                            }).execute()
+                            success_count += 1
                         
-                        st.succe
+                        st.success(f"Saved '{deck_title_input}' ({success_count} phrases)!")
+                        st.rerun()
+        except Exception as e:
+            st.error(f"Error parsing file: {e}")
+
+# ==========================================
+# TAB 3: TYPE / PASTE PHRASES
+# ==========================================
+with tab_paste:
+    st.markdown("### Type or Paste Phrases")
+    raw_text = st.text_area("Phrase pairs (Format: Spanish | English):", placeholder="Hola | Hello\n¿Cómo estás? | How are you?", height=120)
+    deck_title = st.text_input("New Deck Title:", placeholder="My Deck", key="paste_deck_title")
+    separator_choice = st.selectbox("Delimiter:", ["| (Pipe)", ", (Comma)", "Tab"], key="paste_delimiter")
+    
+    if st.button("Process & Save Deck", type="primary"):
+        if not raw_text.strip():
+            st.warning("Please enter phrase pairs.")
+        else:
+            sep = "|" if "|" in separator_choice else ("," if "," in separator_choice else "\t")
+            lines = [line.strip() for line in raw_text.split("\n") if line.strip()]
+            supabase.table("decks").upsert({"name": deck_title}).execute()
+            
+            for line in lines:
+                if sep in line:
+                    parts = line.split(sep, 1)
+                    spanish_text, english_text = parts[0].strip(), parts[1].strip()
+                else:
+                    spanish_text, english_text = line, line
+                
+                supabase.table("phrases").insert({
+                    "deck_name": deck_title,
+                    "spanish": spanish_text,
+                    "english": english_text
+                }).execute()
+            
+            st.success(f"Saved deck '{deck_title}'!")
+            st.rerun()
