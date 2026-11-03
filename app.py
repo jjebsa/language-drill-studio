@@ -115,7 +115,7 @@ if "current_phrase_idx" not in st.session_state:
 
 # --- PROMINENT TOP-LEVEL TABS ---
 tab_practice, tab_upload, tab_paste = st.tabs([
-    "🗣️ Practice Studio",
+    "📚 Practice Studio",
     "📁 Upload File",
     "✍️ Type / Paste"
 ])
@@ -137,9 +137,8 @@ with tab_practice:
         top_col1, top_col2 = st.columns([1.5, 2.5])
         with top_col1:
             st.markdown("### 🗣️ Practice Studio")
-            st.markdown("Listen and Repeat, Shadowing, Active Recall")
         with top_col2:
-            st.caption("#### Select a Deck to Practice ↴")
+            st.caption("##### ↶ Select your Phrase Deck to Practice ↷")
             selected_deck = st.selectbox("Select Deck:", deck_names, key="active_deck_select", label_visibility="collapsed")
 
         if selected_deck:
@@ -150,7 +149,7 @@ with tab_practice:
                 phrases_data = []
                 st.error(f"Error loading phrases for deck '{selected_deck}': {e}")
             
-            with st.expander("✏️ Click to Edit Deck:  Rename Deck, Add/Edit Phrases, delete deck."):
+            with st.expander("✏️ Click to Edit Deck:  Rename, add pairs, delete deck."):
                 new_deck_name = st.text_input("Rename Deck", value=selected_deck, key=f"rename_deck_input_{selected_deck}")
                 if st.button("Update Deck Name", key=f"update_deck_btn_{selected_deck}"):
                     if new_deck_name and new_deck_name != selected_deck:
@@ -192,7 +191,7 @@ with tab_practice:
                 if st.button("🗑️ Delete Selected Deck", type="secondary"):
                     confirm_delete_dialog(selected_deck)
 
-            settings_open = st.toggle("⚙️ SETTINGS: Voice Speed, Repetions per Pair, Pause Between Pairs, Show Translation, Select Recall Mode", value=False, key="toggle_settings")         
+            settings_open = st.toggle("⚙️ Practice Settings", value=False, key="toggle_settings")
             
             if settings_open:
                 c1, c2, c3, c4 = st.columns(4)
@@ -204,7 +203,7 @@ with tab_practice:
                     pause_duration = st.number_input("Pause (s)", 1.0, 10.0, 2.0, 0.5, key="setting_pause")
                 with c4:
                     reverse_recall = st.checkbox("Recall Mode (EN->ES)", value=False, key="setting_reverse")
-                    show_translation = st.checkbox("Show Translation Off/On", value=True, key="setting_show_trans")
+                    show_translation = st.checkbox("Translation Off/On", value=True, key="setting_show_trans")
             else:
                 speed_choice = st.session_state.get("setting_speed", "Normal")
                 repetitions = st.session_state.get("setting_reps", 1)
@@ -347,8 +346,8 @@ with tab_upload:
     st.markdown("### Upload Bilingual Phrase File")
     
     # Use session state keys to manage clearing input fields cleanly
-    uploaded_file = st.file_uploader("Choose a premade .CSV, .TSV, or .TXT file from your device. ( 2 columns: target language 1st, translation 2nd. Separated by pipe ( | ), comma, or tab", type=["csv", "tsv", "txt"], key="upload_file_widget")
-    deck_title_input = st.text_input("Enter a Name for your New Deck", placeholder="Imported Deck", key="upload_deck_title")
+    uploaded_file = st.file_uploader("Choose CSV, TSV, or TXT file", type=["csv", "tsv", "txt"], key="upload_file_widget")
+    deck_title_input = st.text_input("New Deck Name:", placeholder="Imported Deck", key="upload_deck_title")
     
     if uploaded_file is not None:
         try:
@@ -420,8 +419,8 @@ with tab_paste:
        st.session_state["clear_paste_form"] = False
     # ---------------------------------
     st.markdown("### Type or Paste Words and Phrases")
-    st.markdown("You can enter multiple pairs here. Be sure to use the separation symbols between your target language and its translation, either pipe (`|`) or comma. (see examples below)") 
-    st.caption("*Optionally, enter one pair, then *SAVE DECK*, then add more lines under *EDIT DECK* in the *PRACTICE STUDIO*. May be easier if typing rather than pasting.*")
+    st.caption("##### You can enter multiple pairs here. Be sure to use the separation symbols between your target language and its translation, either pipe (`|`) or comma. (see examples below)") 
+    st.caption("Optionally, enter one pair, then *SAVE DECK*, then add more lines under *EDIT DECK* in the *PRACTICE STUDIO*. May be easier if typing rather than pasting.")
 
     raw_text = st.text_area(
         "Enter your Phrase or Word Pairs", 
