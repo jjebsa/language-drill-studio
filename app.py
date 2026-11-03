@@ -347,7 +347,7 @@ with tab_upload:
     st.markdown("### Upload Bilingual Phrase File")
     
     # Use session state keys to manage clearing input fields cleanly
-    uploaded_file = st.file_uploader("Choose a premade .CSV, .TSV, or .TXT file from your device. ( 2 columns: target language 1st, translation 2nd. Separated by pipe ( | ), comma, or tab"), type=["csv", "tsv", "txt"], key="upload_file_widget")
+    uploaded_file = st.file_uploader("Choose a premade .CSV, .TSV, or .TXT file from your device.  Two columns: target language 1st, translation 2nd. Separated by pipe ( | ), comma, or tab", type=["csv", "tsv", "txt"], key="upload_file_widget")
     deck_title_input = st.text_input("Enter a Name for your New Deck", placeholder="Imported Deck", key="upload_deck_title")
     
     if uploaded_file is not None:
