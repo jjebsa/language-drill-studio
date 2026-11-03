@@ -138,6 +138,8 @@ with tab_practice:
         with top_col1:
             st.markdown("### 🗣️ Practice Studio")
             st.markdown("Listen and Repeat, Shadowing, Active Recall")
+            st.markdown("What is Active Recall?")
+            st.video("https://youtu.be/43IrHhD8biA")
         with top_col2:
             st.caption("#### Select a Deck to Practice ↴")
             selected_deck = st.selectbox("Select Deck:", deck_names, key="active_deck_select", label_visibility="collapsed")
