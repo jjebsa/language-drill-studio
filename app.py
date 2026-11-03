@@ -144,9 +144,9 @@ with tab_practice:
             html_content = f"""
             <div style="text-align: center; margin: 10px 0;">
                 <a href="https://www.youtube.com/watch?v={video_id}" target="_blank">
-                    <img src="{thumbnail_url}" width="280" style="border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.2);">
+                    <img src="{thumbnail_url}" width="180" style="border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.2);">
                 </a>
-                <p style="font-size: 0.85em; color: gray; margin-top: 6px;">▶ Tap to watch pronunciation guide on YouTube</p>
+                <p style="font-size: 0.85em; color: gray; margin-top: 6px;">▶ Tap to watch "What is Active Rexall" on YouTube</p>
             </div>
             """
             st.markdown(html_content, unsafe_allow_html=True)
