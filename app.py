@@ -420,7 +420,7 @@ with tab_paste:
        st.session_state["clear_paste_form"] = False
     # ---------------------------------
     st.markdown("### Type or Paste Words and Phrases")
-    st.caption("##### You can enter multiple pairs here. Be sure to use the separation symbols between your target language and its translation, either pipe (`|`) or comma. (see examples below)") 
+    st.markdown("You can enter multiple pairs here. Be sure to use the separation symbols between your target language and its translation, either pipe (`|`) or comma. (see examples below)") 
     st.caption("Optionally, enter one pair, then *SAVE DECK*, then add more lines under *EDIT DECK* in the *PRACTICE STUDIO*. May be easier if typing rather than pasting.")
 
     raw_text = st.text_area(
