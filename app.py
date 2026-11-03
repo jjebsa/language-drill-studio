@@ -138,7 +138,7 @@ with tab_practice:
         with top_col1:
             st.markdown("### 🗣️ Practice Studio")
         with top_col2:
-            st.caption("#### Select your Phrase Deck to Practice ↴")
+            st.caption("#### Select a Deck to Practice ↴")
             selected_deck = st.selectbox("Select Deck:", deck_names, key="active_deck_select", label_visibility="collapsed")
 
         if selected_deck:
