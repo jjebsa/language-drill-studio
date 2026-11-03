@@ -105,6 +105,18 @@ def confirm_delete_dialog(deck_name):
             st.toast(f"Deleted deck '{deck_name}'")
             st.rerun()
 
+# --- INITIALIZE SESSION STATE FOR DEFAULTS ---
+defaults = {
+    "setting_speed": "Normal",
+    "setting_reps": 1,
+    "setting_pause": 2.0,
+    "setting_reverse": False,
+    "setting_show_trans": True
+}
+for key, val in defaults.items():
+    if key not in st.session_state:
+        st.session_state[key] = val
+
 # --- INITIALIZE SESSION STATE FOR DRILL RUNNER ---
 if "drill_active" not in st.session_state:
     st.session_state["drill_active"] = False
@@ -192,25 +204,28 @@ with tab_practice:
                 if st.button("🗑️ Delete Selected Deck", type="secondary"):
                     confirm_delete_dialog(selected_deck)
 
-            settings_open = st.toggle("⚙️ SETTINGS: Voice Speed, Repetions per Pair, Pause Between Pairs, Show Translation, Select Recall Mode", value=False, key="toggle_settings")         
+                        settings_open = st.toggle("⚙️ SETTINGS: Voice Speed, Repetions per Pair, Pause Between Pairs, Show Translation, Select Recall Mode", value=False, key="toggle_settings")         
             
+            # Always display settings controls if toggled open, but let session_state maintain values globally
             if settings_open:
                 c1, c2, c3, c4 = st.columns(4)
                 with c1:
-                    speed_choice = st.selectbox("Speed", ["Normal", "Slow", "Slower", "Slowest", "Faster"], index=0, key="setting_speed")
+                    speed_choice = st.selectbox("Speed", ["Normal", "Slow", "Slower", "Slowest", "Faster"], key="setting_speed")
                 with c2:
-                    repetitions = st.number_input("Reps", min_value=1, max_value=5, value=1, key="setting_reps")
+                    repetitions = st.number_input("Reps", min_value=1, max_value=5, key="setting_reps")
                 with c3:
-                    pause_duration = st.number_input("Pause (s)", 1.0, 10.0, 2.0, 0.5, key="setting_pause")
+                    pause_duration = st.number_input("Pause (s)", 1.0, 10.0, 0.5, key="setting_pause")
                 with c4:
-                    reverse_recall = st.checkbox("Reverse Language Recall Mode", value=False, key="setting_reverse")
-                    show_translation = st.checkbox("Show Translation Off/On", value=True, key="setting_show_trans")
+                    reverse_recall = st.checkbox("Reverse Language Recall Mode", key="setting_reverse")
+                    show_translation = st.checkbox("Show Translation Off/On", key="setting_show_trans")
             else:
-                speed_choice = st.session_state.get("setting_speed", "Normal")
-                repetitions = st.session_state.get("setting_reps", 1)
-                pause_duration = st.session_state.get("setting_pause", 2.0)
-                reverse_recall = st.session_state.get("setting_reverse", False)
-                show_translation = st.session_state.get("setting_show_trans", True)
+                # Pull directly from session state variables bound to the widget keys above
+                speed_choice = st.session_state["setting_speed"]
+                repetitions = st.session_state["setting_reps"]
+                pause_duration = st.session_state["setting_pause"]
+                reverse_recall = st.session_state["setting_reverse"]
+                show_translation = st.session_state["setting_show_trans"]
+
 
             rate_mapping = {
                 "Normal": "+0%",
@@ -400,72 +415,4 @@ with tab_upload:
                                 }).execute()
                                 success_count += 1
                         
-                        st.success(f"Saved '{deck_title_input}' ({success_count} phrases)!")
-                        
-                        # Clear state keys so fields wipe clean on rerun
-                        st.session_state["upload_deck_title"] = ""
-                        time.sleep(0.8) # Brief pause so success message is visible
-                        st.rerun()
-        except Exception as e:
-            st.error(f"Error parsing file: {e}")
-
-# ==========================================
-# TAB 3: TYPE or PASTE PHRASES
-# ==========================================
-with tab_paste:
-    # --- ADD THIS RESET CHECK HERE ---
-    if st.session_state.get("clear_paste_form", False):
-       st.session_state["paste_raw_text"] = ""
-       st.session_state["paste_deck_title"] = ""
-       st.session_state["clear_paste_form"] = False
-    # ---------------------------------
-    st.markdown("### ✍️ Type or Paste Words and Phrases")
-    st.markdown("You can enter multiple pairs here. Be sure to use the separation symbols between your target language and its translation, either pipe (`|`) or comma. (see examples below)") 
-    st.caption("*Optionally, enter one pair, then *SAVE DECK*, then add more lines under *EDIT DECK* in the *PRACTICE STUDIO*. May be easier if typing rather than pasting.*")
-
-    raw_text = st.text_area(
-        "Enter your Phrase or Word Pairs", 
-        placeholder="Hola | Hello\n¿Cómo estás? , How are you?", 
-        height=150,
-        key="paste_raw_text"
-    )
-    deck_title = st.text_input("Enter a Name for your New Deck and click Save Deck", placeholder="My Deck Name", key="paste_deck_title")
-    
-    if st.button("Save Deck", type="primary"):
-        if not raw_text.strip():
-            st.warning("Please enter phrase pairs.")
-        elif not deck_title.strip():
-            st.warning("Please enter a deck title.")
-        else:
-            lines = [line.strip() for line in raw_text.split("\n") if line.strip()]
-            supabase.table("decks").upsert({"name": deck_title.strip()}).execute()
-            
-            for line in lines:
-                # 1. Check for Pipe
-                if "|" in line:
-                    parts = line.split("|", 1)
-                # 2. Check for Tab (clipboard paste or literal '\t')
-                elif "\t" in line:
-                    parts = line.split("\t", 1)
-                elif "\\t" in line:
-                    parts = line.split("\\t", 1)
-                # 3. Check for Comma (splits only on the FIRST comma)
-                elif "," in line:
-                    parts = line.split(",", 1)
-                # Fallback: No delimiter found
-                else:
-                    parts = [line, line]
-                
-                spanish_text = parts[0].strip()
-                english_text = parts[1].strip() if len(parts) > 1 else spanish_text
-                
-                supabase.table("phrases").insert({
-                    "deck_name": deck_title.strip(),
-                    "spanish": spanish_text,
-                    "english": english_text
-                }).execute()
-            
-            st.success(f"Saved deck '{deck_title}' with {len(lines)} phrases!")
-            st.session_state["clear_paste_form"] = True
-            time.sleep(0.8)
-            st.rerun()
+                        st.success
