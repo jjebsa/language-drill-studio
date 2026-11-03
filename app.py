@@ -190,25 +190,24 @@ with tab_practice:
                 if st.button("🗑️ Delete Selected Deck", type="secondary"):
                     confirm_delete_dialog(selected_deck)
 
-            settings_open = st.toggle("⚙️ Practice Settings", value=False, key="toggle_settings")
-            
-            if settings_open:
+            with st.expander("⚙️ SETTINGS: Voice Speed, Repetitions per Pair, Pause Between Pairs, Show Translation, Select Recall Mode", expanded=False):
                 c1, c2, c3, c4 = st.columns(4)
                 with c1:
-                    speed_choice = st.selectbox("Speed", ["Normal", "Slow", "Slower", "Slowest", "Faster"], index=0, key="setting_speed")
+                    speed_choice = st.selectbox("Speed", ["Normal", "Slow", "Slower", "Slowest", "Faster"], key="setting_speed")
                 with c2:
-                    repetitions = st.number_input("Reps", min_value=1, max_value=5, value=1, key="setting_reps")
+                    repetitions = st.number_input("Reps", min_value=1, max_value=5, key="setting_reps")
                 with c3:
-                    pause_duration = st.number_input("Pause (s)", 1.0, 10.0, 2.0, 0.5, key="setting_pause")
+                    pause_duration = st.number_input("Pause (s)", 1.0, 10.0, 0.5, key="setting_pause")
                 with c4:
-                    reverse_recall = st.checkbox("Reverse (EN->ES)", value=False, key="setting_reverse")
-                    show_translation = st.checkbox("Translations", value=True, key="setting_show_trans")
-            else:
-                speed_choice = st.session_state.get("setting_speed", "Normal")
-                repetitions = st.session_state.get("setting_reps", 1)
-                pause_duration = st.session_state.get("setting_pause", 2.0)
-                reverse_recall = st.session_state.get("setting_reverse", False)
-                show_translation = st.session_state.get("setting_show_trans", True)
+                    reverse_recall = st.checkbox("Reverse Language Recall Mode", key="setting_reverse")
+                    show_translation = st.checkbox("Show Translation Off/On", key="setting_show_trans")
+
+            # Always pull the active settings straight from session state
+            speed_choice = st.session_state["setting_speed"]
+            repetitions = st.session_state["setting_reps"]
+            pause_duration = st.session_state["setting_pause"]
+            reverse_recall = st.session_state["setting_reverse"]
+            show_translation = st.session_state["setting_show_trans"]
 
             rate_mapping = {
                 "Normal": "+0%",
