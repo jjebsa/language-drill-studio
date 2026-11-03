@@ -204,7 +204,8 @@ with tab_practice:
                 if st.button("🗑️ Delete Selected Deck", type="secondary"):
                     confirm_delete_dialog(selected_deck)
 
-                        settings_open = st.toggle("⚙️ SETTINGS: Voice Speed, Repetions per Pair, Pause Between Pairs, Show Translation, Select Recall Mode", value=False, key="toggle_settings")         
+             
+            settings_open = st.toggle("⚙️ SETTINGS: Voice Speed, Repetions per Pair, Pause Between Pairs, Show Translation, Select Recall Mode", value=False, key="toggle_settings")         
             
             # Always display settings controls if toggled open, but let session_state maintain values globally
             if settings_open:
@@ -408,11 +409,4 @@ with tab_upload:
                             spanish_val = str(row[col_es]).strip() if col_es and pd.notna(row[col_es]) else ""
                             english_val = str(row[col_en]).strip() if col_en and pd.notna(row[col_en]) else ""
                             if spanish_val and spanish_val != "nan":
-                                supabase.table("phrases").insert({
-                                    "deck_name": deck_title_input.strip(),
-                                    "spanish": spanish_val,
-                                    "english": english_val
-                                }).execute()
-                                success_count += 1
-                        
-                        st.success
+   
