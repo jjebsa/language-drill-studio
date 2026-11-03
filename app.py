@@ -146,7 +146,7 @@ with tab_practice:
                 <a href="https://www.youtube.com/watch?v={video_id}" target="_blank">
                     <img src="{thumbnail_url}" width="120" style="border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.2);">
                 </a>
-                <p style="font-size: 0.85em; color: white; margin-top: 6px;">▶ Tap on image to watch "What is Active Rexall" on YouTube</p>
+                <p style="font-size: 0.85em; color: white; margin-top: 6px;">▶ Tap on image to watch tutorial on YouTube</p>
             </div>
             """
             st.markdown(html_content, unsafe_allow_html=True)
@@ -251,7 +251,6 @@ with tab_practice:
                     border_color = "#ffc107" if st.session_state["drill_paused"] else "#30363d"
                     status_badge = " <span style='color:#ffc107; font-size:0.8rem;'>(PAUSED)</span>" if st.session_state["drill_paused"] else ""
                     
-                    # Direct DIV rendering prevents Streamlit H2 CSS overrides
                     st.markdown(f"""
                     <div style="min-height: 190px; display: flex; align-items: center; justify-content: center; background-color: #0d1117; border-radius: 8px; border: 1px solid {border_color}; margin: 5px 0; padding: 12px 16px;">
                         <div style="text-align: center; width: 100%;">
@@ -262,6 +261,12 @@ with tab_practice:
                     """, unsafe_allow_html=True)
 
                     inject_drill_helpers(st.session_state["drill_active"])
+                    
+                    # Play audio automatically for the active card without blocking thread loops
+                    if not st.session_state["drill_paused"]:
+                        audio_bytes = get_audio_bytes(target, rate_str=selected_rate)
+                        if audio_bytes:
+                            play_audio_silently(audio_bytes)
                     
                     col_nav1, col_nav2 = st.columns([1, 1])
                     with col_nav1:
@@ -298,38 +303,6 @@ with tab_practice:
                     st.session_state["current_phrase_idx"] = 0
                     st.rerun()
 
-            if st.session_state["drill_active"] and not st.session_state["drill_paused"] and phrases_data:
-                curr_idx = st.session_state["current_phrase_idx"]
-                if curr_idx < len(phrases_data):
-                    p = phrases_data[curr_idx]
-                    target = p.get("spanish", "")
-                    
-                    audio_bytes = get_audio_bytes(target, rate_str=selected_rate)
-                    if audio_bytes:
-                        audio_duration = len(audio_bytes) / 6000.0
-                        thinking_time = (pause_duration * 0.5) if reverse_recall else 0
-                        post_audio_pause = pause_duration - thinking_time if reverse_recall else pause_duration
-
-                        if thinking_time > 0:
-                            time.sleep(thinking_time)
-                        
-                        for rep in range(repetitions):
-                            play_audio_silently(audio_bytes)
-                            time.sleep(audio_duration)
-                            if post_audio_pause > 0 and rep < repetitions - 1:
-                                time.sleep(post_audio_pause)
-                        
-                        if post_audio_pause > 0:
-                            time.sleep(post_audio_pause)
-                    
-                    if st.session_state["current_phrase_idx"] < len(phrases_data) - 1:
-                        st.session_state["current_phrase_idx"] += 1
-                        st.rerun()
-                    else:
-                        st.session_state["drill_active"] = False
-                        st.success("🎉 Drill completed!")
-                        st.rerun()
-
             st.divider()
             
             with st.expander(f"📋 Click to view Phrase List and play Individual Phrases ({len(phrases_data)} items)"):
@@ -358,7 +331,6 @@ with tab_practice:
 with tab_upload:
     st.markdown("### Upload Bilingual Phrase File")
     
-    # Use session state keys to manage clearing input fields cleanly
     uploaded_file = st.file_uploader("Choose a premade .CSV, .TSV, or .TXT file from your device. ( 2 columns: target language 1st, translation 2nd. Separated by pipe ( | ), comma, or tab", type=["csv", "tsv", "txt"], key="upload_file_widget")
     deck_title_input = st.text_input("Enter a Name for your New Deck", placeholder="Imported Deck", key="upload_deck_title")
     
@@ -414,9 +386,8 @@ with tab_upload:
                         
                         st.success(f"Saved '{deck_title_input}' ({success_count} phrases)!")
                         
-                        # Clear state keys so fields wipe clean on rerun
                         st.session_state["upload_deck_title"] = ""
-                        time.sleep(0.8) # Brief pause so success message is visible
+                        time.sleep(0.8)
                         st.rerun()
         except Exception as e:
             st.error(f"Error parsing file: {e}")
@@ -425,15 +396,13 @@ with tab_upload:
 # TAB 3: TYPE or PASTE PHRASES
 # ==========================================
 with tab_paste:
-    # --- ADD THIS RESET CHECK HERE ---
     if st.session_state.get("clear_paste_form", False):
        st.session_state["paste_raw_text"] = ""
        st.session_state["paste_deck_title"] = ""
        st.session_state["clear_paste_form"] = False
-    # ---------------------------------
+
     st.markdown("### Type or Paste Words and Phrases")
-    st.markdown("You can enter multiple pairs here. Be sure to use the separation symbols between your target language and its translation, either pipe (`|`) or comma. (see examples below)") 
-    st.caption("*Optionally, enter one pair, then *SAVE DECK*, then add more lines under *EDIT DECK* in the *PRACTICE STUDIO*. May be easier if typing rather than pasting.*")
+    st.markdown("You can enter multiple pairs here. Be sure to use the separation symbols between your target language and its translation, either pipe (`|`) or comma.") 
 
     raw_text = st.text_area(
         "Enter your Phrase or Word Pairs", 
@@ -453,18 +422,14 @@ with tab_paste:
             supabase.table("decks").upsert({"name": deck_title.strip()}).execute()
             
             for line in lines:
-                # 1. Check for Pipe
                 if "|" in line:
                     parts = line.split("|", 1)
-                # 2. Check for Tab (clipboard paste or literal '\t')
                 elif "\t" in line:
                     parts = line.split("\t", 1)
                 elif "\\t" in line:
                     parts = line.split("\\t", 1)
-                # 3. Check for Comma (splits only on the FIRST comma)
                 elif "," in line:
                     parts = line.split(",", 1)
-                # Fallback: No delimiter found
                 else:
                     parts = [line, line]
                 
