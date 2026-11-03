@@ -203,7 +203,7 @@ with tab_practice:
                 with c3:
                     pause_duration = st.number_input("Pause (s)", 1.0, 10.0, 2.0, 0.5, key="setting_pause")
                 with c4:
-                    reverse_recall = st.checkbox("Recall Mode (EN->ES)", value=False, key="setting_reverse")
+                    reverse_recall = st.checkbox("Reverse Language Recall Mode", value=False, key="setting_reverse")
                     show_translation = st.checkbox("Show Translation Off/On", value=True, key="setting_show_trans")
             else:
                 speed_choice = st.session_state.get("setting_speed", "Normal")
