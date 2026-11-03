@@ -344,7 +344,7 @@ with tab_practice:
 # TAB 2: UPLOAD CSV / TSV FILE
 # ==========================================
 with tab_upload:
-    st.markdown("### Upload Bilingual Phrase File")
+    st.markdown("### 📁 Upload Bilingual Phrase File")
     
     # Use session state keys to manage clearing input fields cleanly
     uploaded_file = st.file_uploader("Choose a premade .CSV, .TSV, or .TXT file from your device.  Two columns: target language 1st, translation 2nd. Separated by pipe ( | ), comma, or tab", type=["csv", "tsv", "txt"], key="upload_file_widget")
@@ -419,7 +419,7 @@ with tab_paste:
        st.session_state["paste_deck_title"] = ""
        st.session_state["clear_paste_form"] = False
     # ---------------------------------
-    st.markdown("### Type or Paste Words and Phrases")
+    st.markdown("### ✍️ Type or Paste Words and Phrases")
     st.markdown("You can enter multiple pairs here. Be sure to use the separation symbols between your target language and its translation, either pipe (`|`) or comma. (see examples below)") 
     st.caption("*Optionally, enter one pair, then *SAVE DECK*, then add more lines under *EDIT DECK* in the *PRACTICE STUDIO*. May be easier if typing rather than pasting.*")
 
