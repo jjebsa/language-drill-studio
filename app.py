@@ -115,7 +115,7 @@ if "current_phrase_idx" not in st.session_state:
 
 # --- PROMINENT TOP-LEVEL TABS ---
 tab_practice, tab_upload, tab_paste = st.tabs([
-    "📚 Practice Studio",
+    "🗣️ Practice Studio",
     "📁 Upload File",
     "✍️ Type / Paste"
 ])
