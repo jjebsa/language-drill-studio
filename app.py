@@ -142,17 +142,18 @@ with tab_practice:
 video_id = "43IrHhD8biA" 
 thumbnail_url = f"https://img.youtube.com/vi/{video_id}/hqdefault.jpg"
 
-                st.markdown(
-                    f"""
-                    <div style="text-align: center; margin: 10px 0;">
-                        <a href="https://www.youtube.com/watch?v={video_id}" target="_blank">
-                            <img src="{thumbnail_url}" width="280" style="border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.2);">
-                        </a>
-                        <p style="font-size: 0.85em; color: gray; margin-top: 6px;">▶ Tap to watch pronunciation guide on YouTube</p>
-                    </div>
-                    """,
-                    unsafe_allow_html=True
-                )          
+            st.markdown(
+                f"""
+                <div style="text-align: center; margin: 10px 0;">
+                    <a href="https://www.youtube.com/watch?v={video_id}" target="_blank">
+                        <img src="{thumbnail_url}" width="280" style="border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.2);">
+                    </a>
+                    <p style="font-size: 0.85em; color: gray; margin-top: 6px;">▶ Tap to watch pronunciation guide on YouTube</p>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )          
+            
         with top_col2:
             st.caption("#### Select a Deck to Practice ↴")
             selected_deck = st.selectbox("Select Deck:", deck_names, key="active_deck_select", label_visibility="collapsed")
