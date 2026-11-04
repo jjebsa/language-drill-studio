@@ -130,7 +130,6 @@ tab_practice, tab_upload, tab_paste = st.tabs([
     "📁 Upload File",
     "✍️ Type / Paste"
 ])
-
 # ==========================================
 # TAB 1: PRACTICE STUDIO & LIBRARY
 # ==========================================
@@ -151,13 +150,12 @@ with tab_practice:
             st.markdown("Listen and Repeat, Shadowing, Active Recall")
             video_id = "43IrHhD8biA"
             thumbnail_url = f"https://img.youtube.com/vi/{video_id}/hqdefault.jpg"
-
             html_content = f"""
-            <div style="text-align: center; margin: 10px 0;">
+            <div style="text-align: center; margin: 0px 0;">
                 <a href="https://www.youtube.com/watch?v={video_id}" target="_blank">
                     <img src="{thumbnail_url}" width="120" style="border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.2);">
                 </a>
-                <p style="font-size: 0.85em; color: white; margin-top: 6px;">▶ Tap on image to watch: What is Active Recall?</p>
+                <p style="font-size: 0.85em; color: white; margin-top: 0px;">▶ Tap on image to watch: What is Active Recall?</p>
             </div>
             """
             st.markdown(html_content, unsafe_allow_html=True)
@@ -243,7 +241,7 @@ with tab_practice:
                     )
                 with c4:
                     reverse_recall = st.checkbox(
-                        "Recall Mode (EN->ES)", 
+                        "Reverse Language", 
                         key="setting_reverse"
                     )
                     show_translation = st.checkbox(
@@ -307,7 +305,6 @@ with tab_practice:
                                 st.session_state["current_phrase_idx"] += 1
                                 st.rerun()
 
-            st.divider()
             
             col_p1, col_p2, col_p3 = st.columns([2, 2, 2])
             with col_p1:
@@ -363,8 +360,7 @@ with tab_practice:
                         st.success("🎉 Drill completed!")
                         st.rerun()
 
-            st.divider()
-            
+                        
             with st.expander(f"📋 Click to view Phrase List and play Individual Phrases ({len(phrases_data)} items)"):
                 for idx, p in enumerate(phrases_data, 1):
                     target = p.get("spanish", "")
@@ -373,7 +369,7 @@ with tab_practice:
                     row_cols = st.columns([4, 1])
                     with row_cols[0]:
                         if reverse_recall:
-                            display_str = f"**{idx}.** {translation} &nbsp;|&nbsp; *(Think Target)*"
+                            display_str = f"**{idx}.** {translation} &nbsp;|&nbsp; *(Recall & Say Word/Phrase)*"
                         elif show_translation:
                             display_str = f"**{idx}.** {target} &nbsp;|&nbsp; *{translation}*"
                         else:
