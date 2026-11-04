@@ -157,7 +157,7 @@ with tab_practice:
                 <a href="https://www.youtube.com/watch?v={video_id}" target="_blank">
                     <img src="{thumbnail_url}" width="120" style="border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.2);">
                 </a>
-                <p style="font-size: 0.85em; color: white; margin-top: 6px;">▶ Tap on image to watch "What is Active Recall" on YouTube</p>
+                <p style="font-size: 0.85em; color: white; margin-top: 6px;">▶ Tap on image to watch tutorial on YouTube</p>
             </div>
             """
             st.markdown(html_content, unsafe_allow_html=True)
@@ -167,7 +167,8 @@ with tab_practice:
 
         if selected_deck:
             try:
-                phrases_res = supabase.table("phrases").select("*").eq("deck_name", selected_deck).execute()
+                # Fetch explicitly ordered by line_order (using Python's capitalized False)
+                phrases_res = supabase.table("phrases").select("*").eq("deck_name", selected_deck).order("line_order", desc=False).execute()
                 phrases_data = phrases_res.data if phrases_res.data else []
             except Exception as e:
                 phrases_data = []
@@ -196,14 +197,15 @@ with tab_practice:
                     if st.button("Save Phrase Changes", type="primary"):
                         try:
                             supabase.table("phrases").delete().eq("deck_name", selected_deck).execute()
-                            for _, row in edited_df.iterrows():
+                            for line_idx, (_, row) in enumerate(edited_df.iterrows()):
                                 es = str(row.get("spanish", "")).strip()
                                 en = str(row.get("english", "")).strip()
                                 if es:
                                     supabase.table("phrases").insert({
                                         "deck_name": selected_deck,
                                         "spanish": es,
-                                        "english": en
+                                        "english": en,
+                                        "line_order": line_idx
                                     }).execute()
                             st.success("Phrases updated successfully!")
                             st.rerun()
@@ -215,7 +217,7 @@ with tab_practice:
                 if st.button("🗑️ Delete Selected Deck", type="secondary"):
                     confirm_delete_dialog(selected_deck)
 
-            # --- SETTINGS EXPANDER (Persistent & Cleanly Bound to Session State) ---
+            # --- SETTINGS EXPANDER ---
             with st.expander("⚙️ SETTINGS: Voice Speed, Repetions per Pair, Pause Between Pairs, Show Translation, Select Recall Mode", expanded=False):
                 c1, c2, c3, c4 = st.columns(4)
                 with c1:
@@ -249,7 +251,6 @@ with tab_practice:
                         key="setting_show_trans"
                     )
 
-            # Pull active settings directly from session state variables
             speed_choice = st.session_state["setting_speed"]
             repetitions = st.session_state["setting_reps"]
             pause_duration = st.session_state["setting_pause"]
@@ -275,7 +276,7 @@ with tab_practice:
                     
                     if reverse_recall:
                         main_text = translation if translation else "(No translation)"
-                        sub_text = target if show_translation else "🔊 [Recall Spanish]"
+                        sub_text = target if show_translation else "🔊 [Recall Target]"
                     else:
                         main_text = target
                         sub_text = f"*{translation}*" if show_translation else ""
@@ -329,7 +330,7 @@ with tab_practice:
                     st.session_state["current_phrase_idx"] = 0
                     st.rerun()
 
-            # --- DRILL AUTO-ADVANCE & ACCURATE AUDIO TIMING LOOP ---
+            # --- DRILL AUTO-ADVANCE & TIMING LOOP ---
             if st.session_state["drill_active"] and not st.session_state["drill_paused"] and phrases_data:
                 curr_idx = st.session_state["current_phrase_idx"]
                 if curr_idx < len(phrases_data):
@@ -338,7 +339,6 @@ with tab_practice:
                     
                     audio_bytes = get_audio_bytes(target, rate_str=selected_rate)
                     if audio_bytes:
-                        # Calculate exact audio duration from bytes to prevent audio overlap
                         audio_duration = len(audio_bytes) / 6000.0
                         thinking_time = (pause_duration * 0.5) if reverse_recall else 0
                         post_audio_pause = pause_duration - thinking_time if reverse_recall else pause_duration
@@ -373,7 +373,7 @@ with tab_practice:
                     row_cols = st.columns([4, 1])
                     with row_cols[0]:
                         if reverse_recall:
-                            display_str = f"**{idx}.** {translation} &nbsp;|&nbsp; *(Think Spanish)*"
+                            display_str = f"**{idx}.** {translation} &nbsp;|&nbsp; *(Think Target)*"
                         elif show_translation:
                             display_str = f"**{idx}.** {target} &nbsp;|&nbsp; *{translation}*"
                         else:
@@ -389,15 +389,13 @@ with tab_practice:
 # TAB 2: UPLOAD CSV / TSV FILE
 # ==========================================
 with tab_upload:
-    # --- RESET CHECK (Must be before widgets are created) ---
     if st.session_state.get("clear_upload_form", False):
         st.session_state["upload_deck_title"] = ""
         st.session_state["clear_upload_form"] = False
-    # --------------------------------------------------------
 
     st.markdown("### Upload Bilingual Phrase File")
     
-    uploaded_file = st.file_uploader("Choose a premade .CSV, .TSV, or .TXT file from your device. ( 2 columns: target language 1st, translation 2nd. Separated by pipe ( | ), comma, or tab", type=["csv", "tsv", "txt"], key="upload_file_widget")
+    uploaded_file = st.file_uploader("Choose a premade .CSV, .TSV, or .TXT file from your device. (2 columns: target language 1st, translation 2nd. Separated by pipe (|), comma, or tab)", type=["csv", "tsv", "txt"], key="upload_file_widget")
     deck_title_input = st.text_input("Enter a Name for your New Deck", placeholder="Imported Deck", key="upload_deck_title")
     
     if uploaded_file is not None:
@@ -414,7 +412,6 @@ with tab_upload:
                 sep = "|"
             
             import io
-            # Added header=None so pandas doesn't accidentally skip your first row of phrases
             df = pd.read_csv(io.StringIO(content), sep=sep, header=None)
             
             if len(df.columns) == 1:
@@ -434,26 +431,25 @@ with tab_upload:
                 else:
                     with st.spinner("Saving..."):
                         supabase.table("decks").upsert({"name": deck_title_input.strip()}).execute()
-                        cols = {str(c).lower().strip(): c for c in df.columns}
                         
-                        col_es = cols.get('spanish', cols.get('es', 0))
-                        col_en = cols.get('english', cols.get('en', 1 if len(df.columns) > 1 else 0))
+                        col_target = 0
+                        col_trans = 1 if len(df.columns) > 1 else 0
                         
                         success_count = 0
-                        for _, row in df.iterrows():
-                            spanish_val = str(row[col_es]).strip() if pd.notna(row[col_es]) else ""
-                            english_val = str(row[col_en]).strip() if pd.notna(row[col_en]) else ""
-                            if spanish_val and spanish_val != "nan":
+                        for line_idx, (_, row) in enumerate(df.iterrows()):
+                            target_val = str(row[col_target]).strip() if pd.notna(row[col_target]) else ""
+                            trans_val = str(row[col_trans]).strip() if pd.notna(row[col_trans]) else ""
+                            if target_val and target_val != "nan":
                                 supabase.table("phrases").insert({
                                     "deck_name": deck_title_input.strip(),
-                                    "spanish": spanish_val,
-                                    "english": english_val
+                                    "spanish": target_val,
+                                    "english": trans_val,
+                                    "line_order": line_idx
                                 }).execute()
                                 success_count += 1
                         
                         st.success(f"Saved '{deck_title_input}' ({success_count} phrases)!")
                         
-                        # Trigger the flag instead of modifying the widget state directly
                         st.session_state["clear_upload_form"] = True
                         time.sleep(0.8)
                         st.rerun()
@@ -469,9 +465,8 @@ with tab_paste:
        st.session_state["paste_deck_title"] = ""
        st.session_state["clear_paste_form"] = False
 
-    st.markdown("### ✍️ Type or Paste Words and Phrases")
+    st.markdown("### Type or Paste Words and Phrases")
     st.markdown("You can enter multiple pairs here. Be sure to use the separation symbols between your target language and its translation, either pipe (`|`) or comma.") 
-    st.caption("*Optionally, enter one pair, then *SAVE DECK*, then add more lines under *EDIT DECK* in the *PRACTICE STUDIO*. May be easier if typing rather than pasting.*")
 
     raw_text = st.text_area(
         "Enter your Phrase or Word Pairs", 
@@ -490,7 +485,7 @@ with tab_paste:
             lines = [line.strip() for line in raw_text.split("\n") if line.strip()]
             supabase.table("decks").upsert({"name": deck_title.strip()}).execute()
             
-            for line in lines:
+            for line_idx, line in enumerate(lines):
                 if "|" in line:
                     parts = line.split("|", 1)
                 elif "\t" in line:
@@ -502,13 +497,14 @@ with tab_paste:
                 else:
                     parts = [line, line]
                 
-                spanish_text = parts[0].strip()
-                english_text = parts[1].strip() if len(parts) > 1 else spanish_text
+                target_text = parts[0].strip()
+                trans_text = parts[1].strip() if len(parts) > 1 else target_text
                 
                 supabase.table("phrases").insert({
                     "deck_name": deck_title.strip(),
-                    "spanish": spanish_text,
-                    "english": english_text
+                    "spanish": target_text,
+                    "english": trans_text,
+                    "line_order": line_idx
                 }).execute()
             
             st.success(f"Saved deck '{deck_title}' with {len(lines)} phrases!")
