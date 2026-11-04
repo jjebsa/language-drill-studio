@@ -1,496 +1,427 @@
 import streamlit as st
 import asyncio
-import edge_tts
 import os
-import subprocess
-import csv
-import io
-import json
+import tempfile
+import time
 import base64
-from deep_translator import GoogleTranslator
+import pandas as pd
+from supabase import create_client, Client
+import edge_tts
 
-st.set_page_config(page_title="Spanish Audio Drill Generator", layout="centered")
+# --- PAGE CONFIG ---
+st.set_page_config(
+    page_title="Language Practice Studio",
+    page_icon="🗣️",
+    layout="wide"
+)
 
-st.title("🇪🇸 Spanish Listening Drill Studio")
+# --- SUPABASE CONNECTION ---
+@st.cache_resource
+def init_supabase():
+    url = st.secrets.get("SUPABASE_URL")
+    key = st.secrets.get("SUPABASE_KEY")
+    if not url or not key:
+        return None
+    return create_client(url, key)
 
-LIBRARY_DIR = "saved_lists"
-AUDIO_DIR = "audio_cache"
-os.makedirs(LIBRARY_DIR, exist_ok=True)
-os.makedirs(AUDIO_DIR, exist_ok=True)
+supabase: Client = init_supabase()
 
-# --- Session State Setup ---
-if "current_pairs" not in st.session_state:
-    st.session_state.current_pairs = None
-if "selected_deck" not in st.session_state:
-    st.session_state.selected_deck = None
+if not supabase:
+    st.error("⚠️ Supabase credentials missing! Please configure `SUPABASE_URL` and `SUPABASE_KEY` in Streamlit Secrets.")
+    st.stop()
 
-def parse_and_translate(content, filename=None):
-    """Parses CSV content, preserves full sentences containing commas, translates single columns, and updates file."""
-    translator = GoogleTranslator(source='es', target='en')
-    pairs = []
-    translations_added = False
+# --- INITIALIZE SESSION STATE & PERSISTENT DEFAULTS ---
+if "setting_speed" not in st.session_state:
+    st.session_state["setting_speed"] = "Normal"
+if "setting_reps" not in st.session_state:
+    st.session_state["setting_reps"] = 1
+if "setting_pause" not in st.session_state:
+    st.session_state["setting_pause"] = 2.0
+if "setting_reverse" not in st.session_state:
+    st.session_state["setting_reverse"] = False
+if "setting_show_trans" not in st.session_state:
+    st.session_state["setting_show_trans"] = True
 
-    f_csv = io.StringIO(content.strip())
-    reader = list(csv.reader(f_csv))
-    
-    if not reader:
-        return pairs
+if "drill_active" not in st.session_state:
+    st.session_state["drill_active"] = False
+if "drill_paused" not in st.session_state:
+    st.session_state["drill_paused"] = False
+if "current_phrase_idx" not in st.session_state:
+    st.session_state["current_phrase_idx"] = 0
 
-    has_explicit_en_col = False
-    start_idx = 0
+# --- HELPER: AUDIO GENERATION & SILENT PLAYBACK ---
+async def generate_audio_async(text, voice, rate_str, output_path):
+    communicate = edge_tts.Communicate(text, voice, rate=rate_str)
+    await communicate.save(output_path)
 
-    # Inspect first row for explicit 2-column header
-    first_row = [field.strip().lower() for field in reader[0] if field.strip()]
-    if first_row:
-        if len(first_row) >= 2 and first_row[0] in ["spanish", "phrase", "text", "es"] and first_row[1] in ["english", "translation", "en"]:
-            has_explicit_en_col = True
-            start_idx = 1
-        elif len(first_row) == 1 and first_row[0] in ["spanish", "phrase", "text", "es"]:
-            start_idx = 1
+def get_audio_bytes(text, voice="es-ES-AlvaroNeural", rate_str="+0%"):
+    if not text:
+        return None
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tf:
+        tmp_path = tf.name
+    try:
+        loop.run_until_complete(generate_audio_async(text, voice, rate_str, tmp_path))
+        with open(tmp_path, "rb") as f:
+            audio_bytes = f.read()
+        return audio_bytes
+    except Exception as e:
+        st.error(f"Audio generation error: {e}")
+        return None
+    finally:
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
 
-    for row in reader[start_idx:]:
-        clean_fields = [f.strip().strip('"').strip("'") for f in row if f.strip()]
-        if not clean_fields:
-            continue
+def play_audio_silently(audio_bytes):
+    if not audio_bytes:
+        return
+    b64 = base64.b64encode(audio_bytes).decode()
+    audio_html = f'<audio autoplay="true" src="data:audio/mp3;base64,{b64}"></audio>'
+    st.markdown(audio_html, unsafe_allow_html=True)
 
-        if has_explicit_en_col and len(clean_fields) >= 2:
-            es = clean_fields[0]
-            en = clean_fields[1]
-        else:
-            # Single-column list: recombine any fields split by commas back into full Spanish phrase
-            es = ", ".join(clean_fields)
-            en = ""
+def inject_drill_helpers(is_active):
+    if is_active:
+        wake_lock_js = """
+        <script>
+        let wakeLock = null;
+        async function requestWakeLock() {
+            try {
+                if ('wakeLock' in navigator) {
+                    wakeLock = await navigator.wakeLock.request('screen');
+                }
+            } catch (err) {
+                console.log(err);
+            }
+        }
+        requestWakeLock();
+        </script>
+        """
+        st.markdown(wake_lock_js, unsafe_allow_html=True)
+    else:
+        release_js = """
+        <script>
+        if (typeof wakeLock !== 'undefined' && wakeLock !== null) {
+            wakeLock.release().then(() => { wakeLock = null; });
+        }
+        </script>
+        """
+        st.markdown(release_js, unsafe_allow_html=True)
 
-        if es:
-            if not en:
-                try:
-                    en = translator.translate(es)
-                except Exception:
-                    en = "Translation unavailable"
-                translations_added = True
-            pairs.append((es, en))
-
-    # Overwrite library file with full [spanish, english] columns if translations were generated
-    if translations_added and filename:
-        file_path = os.path.join(LIBRARY_DIR, filename)
-        with open(file_path, "w", encoding="utf-8", newline="") as f:
-            writer = csv.writer(f)
-            writer.writerow(["spanish", "english"])
-            for es_text, en_text in pairs:
-                writer.writerow([es_text, en_text])
-
-    return pairs
-
-async def generate_phrase_chunks(phrases, deck_folder, voice):
-    """Generates individual TTS mp3 chunks for each sentence in a deck."""
-    os.makedirs(deck_folder, exist_ok=True)
-    for idx, text in enumerate(phrases):
-        chunk_path = os.path.join(deck_folder, f"{idx}.mp3")
-        if not os.path.exists(chunk_path):
-            communicate = edge_tts.Communicate(text, voice)
-            await communicate.save(chunk_path)
-
-# --- Phrase Library Management ---
-st.subheader("📚 Phrase Library")
-
-tab_upload, tab_type = st.tabs(["📁 Upload CSV File", "✍️ Type / Paste Spanish Phrases"])
-
-with tab_upload:
-    uploaded_file = st.file_uploader("Upload New Phrase CSV", type=["csv"], key="uploader")
-    if uploaded_file:
-        file_name = uploaded_file.name
-        save_path = os.path.join(LIBRARY_DIR, file_name)
-        
-        if not os.path.exists(save_path):
-            raw_bytes = uploaded_file.getvalue()
-            with open(save_path, "wb") as f:
-                f.write(raw_bytes)
-            st.session_state.selected_deck = file_name
-            st.toast(f"Saved '{file_name}' to library!", icon="💾")
+# --- DIALOG: DELETE CONFIRMATION ---
+@st.dialog("Confirm Deck Deletion")
+def confirm_delete_dialog(deck_name):
+    st.write(f"Are you sure you want to delete the selected deck **'{deck_name}'**?")
+    st.caption("This action will permanently delete all associated phrases.")
+    c_cancel, c_confirm = st.columns(2)
+    with c_cancel:
+        if st.button("Cancel", use_container_width=True):
+            st.rerun()
+    with c_confirm:
+        if st.button("Confirm Delete", type="primary", use_container_width=True):
+            supabase.table("phrases").delete().eq("deck_name", deck_name).execute()
+            supabase.table("decks").delete().eq("name", deck_name).execute()
+            st.toast(f"Deleted deck '{deck_name}'")
             st.rerun()
 
-with tab_type:
-    deck_title = st.text_input("Deck Name", placeholder="e.g., Local_Phrases", key="input_deck_name")
-    
-    # Language direction toggle
-    input_lang = st.radio(
-        "Input Language:", 
-        ["Spanish", "English"], 
-        horizontal=True, 
-        key="input_lang_radio"
-    )
-    
-    typed_phrases = st.text_area(
-        f"Enter {input_lang} phrases (one per line):", 
-        height=140, 
-        placeholder="¿Dónde está el ayuntamiento?\nMe gustaría comprar un kilo de naranjas, por favor." if input_lang == "Spanish" else "Where is the town hall?\nI would like to buy a kilo of oranges, please.", 
-        key="input_phrases"
-    )
-    
-    if st.button("Save as New CSV Deck", key="btn_save_typed"):
-        if not deck_title.strip():
-            st.error("Please enter a deck name.")
-        elif not typed_phrases.strip():
-            st.error("Please enter at least one phrase.")
-        else:
-            clean_title = deck_title.strip().replace(" ", "_")
-            if not clean_title.lower().endswith(".csv"):
-                clean_title += ".csv"
-            save_path = os.path.join(LIBRARY_DIR, clean_title)
-            
-            phrases_list = [p.strip() for p in typed_phrases.splitlines() if p.strip()]
-            
-            with st.spinner("Translating and creating deck..."):
-                with open(save_path, "w", encoding="utf-8", newline="") as f:
-                    writer = csv.writer(f)
-                    if input_lang == "English":
-                        # Translate English input to Spanish for audio playback
-                        translator = GoogleTranslator(source='en', target='es')
-                        writer.writerow(["spanish", "english"])
-                        for en_phrase in phrases_list:
-                            try:
-                                es_phrase = translator.translate(en_phrase)
-                            except Exception:
-                                es_phrase = en_phrase
-                            writer.writerow([es_phrase, en_phrase])
-                    else:
-                        # Spanish input (translated to EN automatically on deck load)
-                        writer.writerow(["spanish"])
-                        for phrase in phrases_list:
-                            writer.writerow([phrase])
-            
-            st.session_state.selected_deck = clean_title
-            st.toast(f"Created deck '{clean_title}'!", icon="🎉")
-            st.rerun()
+# --- PROMINENT TOP-LEVEL TABS ---
+tab_practice, tab_upload, tab_paste = st.tabs([
+    "🗣️ Practice Studio",
+    "📁 Upload File",
+    "✍️ Type / Paste"
+])
 
-st.divider()
+# ==========================================
+# TAB 1: PRACTICE STUDIO & LIBRARY
+# ==========================================
+with tab_practice:
+    try:
+        decks_res = supabase.table("decks").select("name").execute()
+        deck_names = [d["name"] for d in decks_res.data] if decks_res.data else []
+    except Exception as e:
+        deck_names = []
+        st.warning(f"Could not load decks from Supabase: {e}")
 
-saved_files = sorted([f for f in os.listdir(LIBRARY_DIR) if f.endswith('.csv')])
+    if not deck_names:
+        st.info("No decks found in Supabase yet. Use the 'Upload File' or 'Type / Paste' tabs above to add your first deck!")
+    else:
+        top_col1, top_col2 = st.columns([1.5, 2.5])
+        with top_col1:
+            st.markdown("### 🗣️ Practice Studio")
+            st.markdown("Listen and Repeat, Shadowing, Active Recall")
+            video_id = "43IrHhD8biA"
+            thumbnail_url = f"https://img.youtube.com/vi/{video_id}/hqdefault.jpg"
 
-if saved_files:
-    col_select, col_delete = st.columns([3, 1])
-    with col_select:
-        selected_deck = st.selectbox(
-            "Select a Phrase Deck:", 
-            saved_files, 
-            index=saved_files.index(st.session_state.selected_deck) if st.session_state.selected_deck in saved_files else 0,
-            key="deck_selector"
-        )
-        st.session_state.selected_deck = selected_deck
-        
-    with col_delete:
-        st.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True)
-        if st.button("🗑️ Delete", type="secondary", use_container_width=True, key="btn_delete"):
-            os.remove(os.path.join(LIBRARY_DIR, selected_deck))
-            
-            deck_base = os.path.splitext(selected_deck)[0]
-            cache_folder = os.path.join(AUDIO_DIR, deck_base)
-            if os.path.exists(cache_folder):
-                for f in os.listdir(cache_folder):
-                    os.remove(os.path.join(cache_folder, f))
-                os.rmdir(cache_folder)
-
-            st.session_state.selected_deck = None
-            st.session_state.current_pairs = None
-            st.toast(f"Deleted '{selected_deck}'")
-            st.rerun()
-
-    file_path = os.path.join(LIBRARY_DIR, selected_deck)
-    with open(file_path, "r", encoding="utf-8-sig") as f:
-        st.session_state.current_pairs = parse_and_translate(f.read(), selected_deck)
-
-else:
-    st.info("No CSV decks available. Upload a CSV file or type phrases above to get started.")
-
-st.divider()
-
-# --- Voice Selection & Generator ---
-if st.session_state.current_pairs and st.session_state.selected_deck:
-    deck_base = os.path.splitext(st.session_state.selected_deck)[0]
-    deck_audio_folder = os.path.join(AUDIO_DIR, deck_base)
-    
-    voice = st.selectbox(
-        "Voice Model", 
-        ["es-ES-AlvaroNeural", "es-ES-ElviraNeural", "es-ES-XimenaNeural"], 
-        key="voice_select"
-    )
-    
-    spanish_phrases = [p[0] for p in st.session_state.current_pairs]
-    
-    if st.button("🚀 Prepare / Rebuild Audio Chunks", use_container_width=True, key="btn_prep_audio"):
-        with st.spinner("Generating audio for sentences..."):
-            if os.path.exists(deck_audio_folder):
-                for f in os.listdir(deck_audio_folder):
-                    os.remove(os.path.join(deck_audio_folder, f))
-            asyncio.run(generate_phrase_chunks(spanish_phrases, deck_audio_folder, voice))
-        st.toast("Audio prepared successfully!")
-        st.rerun()
-
-    chunks_exist = os.path.exists(deck_audio_folder) and len(os.listdir(deck_audio_folder)) >= len(spanish_phrases)
-    if not chunks_exist:
-        with st.spinner("Preparing initial sentence audio..."):
-            asyncio.run(generate_phrase_chunks(spanish_phrases, deck_audio_folder, voice))
-            chunks_exist = True
-
-    # --- Synced Interactive Drill Player ---
-    if chunks_exist:
-        st.divider()
-        st.subheader("🎧 Synced Practice Studio")
-
-        audio_data_uris = []
-        for i in range(len(spanish_phrases)):
-            chunk_file = os.path.join(deck_audio_folder, f"{i}.mp3")
-            if os.path.exists(chunk_file):
-                with open(chunk_file, "rb") as f:
-                    b64 = base64.b64encode(f.read()).decode("utf-8")
-                    audio_data_uris.append(f"data:audio/mp3;base64,{b64}")
-            else:
-                audio_data_uris.append("")
-
-        deck_payload = json.dumps([
-            {"es": es, "en": en, "audio": uri}
-            for (es, en), uri in zip(st.session_state.current_pairs, audio_data_uris)
-        ])
-
-        player_html = f"""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <style>
-                body {{
-                    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-                    background-color: transparent;
-                    color: #1f2937;
-                    margin: 0;
-                    padding: 0;
-                }}
-                .player-card {{
-                    border: 1px solid #e5e7eb;
-                    border-radius: 12px;
-                    padding: 24px;
-                    background-color: #ffffff;
-                    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-                }}
-                .controls-grid {{
-                    display: grid;
-                    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-                    gap: 16px;
-                    margin-bottom: 20px;
-                    background: #f9fafb;
-                    padding: 16px;
-                    border-radius: 8px;
-                }}
-                .control-group {{
-                    display: flex;
-                    flex-direction: column;
-                }}
-                .control-group label {{
-                    font-size: 0.85rem;
-                    font-weight: 600;
-                    color: #4b5563;
-                    margin-bottom: 4px;
-                }}
-                .control-group input[type="range"], .control-group select {{
-                    width: 100%;
-                }}
-                .card-display {{
-                    min-height: 140px;
-                    display: flex;
-                    flex-direction: column;
-                    justify-content: center;
-                    align-items: center;
-                    text-align: center;
-                    background-color: #f3f4f6;
-                    border-radius: 10px;
-                    padding: 20px;
-                    margin-bottom: 20px;
-                }}
-                .es-text {{
-                    font-size: 1.5rem;
-                    font-weight: 700;
-                    color: #111827;
-                    margin-bottom: 8px;
-                }}
-                .en-text {{
-                    font-size: 1.1rem;
-                    color: #6b7280;
-                    font-style: italic;
-                }}
-                .nav-bar {{
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                    gap: 12px;
-                }}
-                .btn {{
-                    background-color: #2563eb;
-                    color: white;
-                    border: none;
-                    padding: 10px 18px;
-                    font-size: 0.95rem;
-                    font-weight: 600;
-                    border-radius: 6px;
-                    cursor: pointer;
-                    transition: background 0.2s;
-                }}
-                .btn:hover {{
-                    background-color: #1d4ed8;
-                }}
-                .btn-secondary {{
-                    background-color: #4b5563;
-                }}
-                .btn-secondary:hover {{
-                    background-color: #374151;
-                }}
-                .btn:disabled {{
-                    background-color: #d1d5db;
-                    cursor: not-allowed;
-                }}
-                .counter-text {{
-                    font-weight: 600;
-                    color: #374151;
-                }}
-            </style>
-        </head>
-        <body>
-            <div class="player-card">
-                <div class="controls-grid">
-                    <div class="control-group">
-                        <label>Speed: <span id="speedVal">1.0x</span></label>
-                        <input type="range" id="speedSlider" min="0.5" max="1.5" step="0.1" value="1.0">
-                    </div>
-                    <div class="control-group">
-                        <label>Repeats: <span id="repeatVal">2</span></label>
-                        <input type="range" id="repeatSlider" min="1" max="5" step="1" value="2">
-                    </div>
-                    <div class="control-group">
-                        <label>Pause Gap: <span id="pauseVal">3.0s</span></label>
-                        <input type="range" id="pauseSlider" min="1.0" max="6.0" step="0.5" value="3.0">
-                    </div>
-                    <div class="control-group">
-                        <label>Translation</label>
-                        <button class="btn btn-secondary" id="toggleEnBtn" style="padding: 6px 12px; font-size: 0.85rem;">Toggle English</button>
-                    </div>
-                </div>
-
-                <div class="card-display">
-                    <div class="es-text" id="esDisplay">---</div>
-                    <div class="en-text" id="enDisplay" style="display: none;">---</div>
-                </div>
-
-                <div class="nav-bar">
-                    <button class="btn btn-secondary" id="prevBtn">⬅️ Previous</button>
-                    <button class="btn" id="playPauseBtn">▶️ Play Drill</button>
-                    <span class="counter-text" id="counterDisplay">Sentence 1 of 1</span>
-                    <button class="btn btn-secondary" id="nextBtn">Next ➡️</button>
-                </div>
+            html_content = f"""
+            <div style="text-align: center; margin: 10px 0;">
+                <a href="https://www.youtube.com/watch?v={video_id}" target="_blank">
+                    <img src="{thumbnail_url}" width="120" style="border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.2);">
+                </a>
+                <p style="font-size: 0.85em; color: white; margin-top: 6px;">▶ Tap on image to watch tutorial on YouTube</p>
             </div>
+            """
+            st.markdown(html_content, unsafe_allow_html=True)
+        with top_col2:
+            st.caption("#### Select a Deck to Practice ↴")
+            selected_deck = st.selectbox("Select Deck:", deck_names, key="active_deck_select", label_visibility="collapsed")
 
-            <script>
-                const deck = {deck_payload};
-                let currentIndex = 0;
-                let currentRepeat = 0;
-                let isPlaying = false;
-                let showEnglish = false;
-                let timerId = null;
-                let currentAudio = null;
+        if selected_deck:
+            try:
+                phrases_res = supabase.table("phrases").select("*").eq("deck_name", selected_deck).execute()
+                phrases_data = phrases_res.data if phrases_res.data else []
+            except Exception as e:
+                phrases_data = []
+                st.error(f"Error loading phrases for deck '{selected_deck}': {e}")
+            
+            with st.expander("✏️ Click to Edit Deck:  Rename Deck, Add/Edit Phrases, delete deck."):
+                new_deck_name = st.text_input("Rename Deck", value=selected_deck, key=f"rename_deck_input_{selected_deck}")
+                if st.button("Update Deck Name", key=f"update_deck_btn_{selected_deck}"):
+                    if new_deck_name and new_deck_name != selected_deck:
+                        try:
+                            supabase.table("decks").upsert({"name": new_deck_name}).execute()
+                            supabase.table("phrases").update({"deck_name": new_deck_name}).eq("deck_name", selected_deck).execute()
+                            supabase.table("decks").delete().eq("name", selected_deck).execute()
+                            st.success("Deck renamed successfully!")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Error renaming deck: {e}")
 
-                const esDisplay = document.getElementById('esDisplay');
-                const enDisplay = document.getElementById('enDisplay');
-                const counterDisplay = document.getElementById('counterDisplay');
-                const playPauseBtn = document.getElementById('playPauseBtn');
-                const prevBtn = document.getElementById('prevBtn');
-                const nextBtn = document.getElementById('nextBtn');
-                const toggleEnBtn = document.getElementById('toggleEnBtn');
+                st.markdown("---")
+                st.markdown("### Modify Phrases")
+                df_phrases = pd.DataFrame(phrases_data)
+                if not df_phrases.empty:
+                    editable_df = df_phrases[['spanish', 'english']] if 'spanish' in df_phrases.columns else df_phrases
+                    edited_df = st.data_editor(editable_df, num_rows="dynamic", key=f"editor_{selected_deck}")
+                    
+                    if st.button("Save Phrase Changes", type="primary"):
+                        try:
+                            supabase.table("phrases").delete().eq("deck_name", selected_deck).execute()
+                            for _, row in edited_df.iterrows():
+                                es = str(row.get("spanish", "")).strip()
+                                en = str(row.get("english", "")).strip()
+                                if es:
+                                    supabase.table("phrases").insert({
+                                        "deck_name": selected_deck,
+                                        "spanish": es,
+                                        "english": en
+                                    }).execute()
+                            st.success("Phrases updated successfully!")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Error updating phrases: {e}")
 
-                const speedSlider = document.getElementById('speedSlider');
-                const repeatSlider = document.getElementById('repeatSlider');
-                const pauseSlider = document.getElementById('pauseSlider');
+                st.markdown("---")
+                st.markdown("### Danger Zone")
+                if st.button("🗑️ Delete Selected Deck", type="secondary"):
+                    confirm_delete_dialog(selected_deck)
 
-                const speedVal = document.getElementById('speedVal');
-                const repeatVal = document.getElementById('repeatVal');
-                const pauseVal = document.getElementById('pauseVal');
+            # --- SETTINGS EXPANDER (Persistent & Out of Sight) ---
+            with st.expander("⚙️ SETTINGS: Voice Speed, Repetitions per Pair, Pause Between Pairs, Show Translation, Select Recall Mode", expanded=False):
+                c1, c2, c3, c4 = st.columns(4)
+                with c1:
+                    speed_choice = st.selectbox(
+                        "Speed", 
+                        ["Normal", "Slow", "Slower", "Slowest", "Faster"], 
+                        index=["Normal", "Slow", "Slower", "Slowest", "Faster"].index(st.session_state["setting_speed"]),
+                        key="setting_speed"
+                    )
+                with c2:
+                    repetitions = st.number_input(
+                        "Reps", 
+                        min_value=1, 
+                        max_value=5, 
+                        value=st.session_state["setting_reps"], 
+                        key="setting_reps"
+                    )
+                with c3:
+                    pause_duration = st.number_input(
+                        "Pause (s)", 
+                        min_value=1.0, 
+                        max_value=10.0, 
+                        value=st.session_state["setting_pause"], 
+                        step=0.5, 
+                        key="setting_pause"
+                    )
+                with c4:
+                    reverse_recall = st.checkbox(
+                        "Recall Mode (EN->ES)", 
+                        value=st.session_state["setting_reverse"], 
+                        key="setting_reverse"
+                    )
+                    show_translation = st.checkbox(
+                        "Show Translation Off/On", 
+                        value=st.session_state["setting_show_trans"], 
+                        key="setting_show_trans"
+                    )
 
-                function updateCard() {{
-                    const item = deck[currentIndex];
-                    esDisplay.innerText = item.es;
-                    enDisplay.innerText = item.en || '';
-                    enDisplay.style.display = showEnglish ? 'block' : 'none';
-                    counterDisplay.innerText = `Sentence ${{currentIndex + 1}} of ${{deck.length}}`;
+            # Pull active settings directly from session state variables
+            speed_choice = st.session_state["setting_speed"]
+            repetitions = st.session_state["setting_reps"]
+            pause_duration = st.session_state["setting_pause"]
+            reverse_recall = st.session_state["setting_reverse"]
+            show_translation = st.session_state["setting_show_trans"]
 
-                    prevBtn.disabled = currentIndex === 0;
-                    nextBtn.disabled = currentIndex === deck.length - 1;
-                }}
+            rate_mapping = {
+                "Normal": "+0%",
+                "Slow": "-20%",
+                "Slower": "-30%",
+                "Slowest": "-40%",
+                "Faster": "+15%"
+            }
+            selected_rate = rate_mapping[speed_choice]
+            
+            if st.session_state["drill_active"] and phrases_data:
+                curr_idx = st.session_state["current_phrase_idx"]
+                
+                if curr_idx < len(phrases_data):
+                    p = phrases_data[curr_idx]
+                    target = p.get("spanish", "")
+                    translation = p.get("english", "")
+                    
+                    if reverse_recall:
+                        main_text = translation if translation else "(No translation)"
+                        sub_text = target if show_translation else "🔊 [Recall Spanish]"
+                    else:
+                        main_text = target
+                        sub_text = f"*{translation}*" if show_translation else ""
+                    
+                    border_color = "#ffc107" if st.session_state["drill_paused"] else "#30363d"
+                    status_badge = " <span style='color:#ffc107; font-size:0.8rem;'>(PAUSED)</span>" if st.session_state["drill_paused"] else ""
+                    
+                    st.markdown(f"""
+                    <div style="min-height: 190px; display: flex; align-items: center; justify-content: center; background-color: #0d1117; border-radius: 8px; border: 1px solid {border_color}; margin: 5px 0; padding: 12px 16px;">
+                        <div style="text-align: center; width: 100%;">
+                            <div style="color: #ffffff; font-size: 1.15rem; font-weight: 600; line-height: 1.3; margin-bottom: 8px;">{main_text}{status_badge}</div>
+                            <div style="color: #8b949e; font-size: 0.9rem; font-weight: 400; margin: 0;">{sub_text}</div>
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
 
-                function playSentence() {{
-                    if (!isPlaying) return;
+                    inject_drill_helpers(st.session_state["drill_active"])
+                    
+                    col_nav1, col_nav2 = st.columns([1, 1])
+                    with col_nav1:
+                        if st.button("⬅️ Previous", use_container_width=True, disabled=curr_idx == 0):
+                            if st.session_state["current_phrase_idx"] > 0:
+                                st.session_state["current_phrase_idx"] -= 1
+                                st.rerun()
+                    with col_nav2:
+                        if st.button("➡️ Next", use_container_width=True, disabled=curr_idx >= len(phrases_data) - 1):
+                            if st.session_state["current_phrase_idx"] < len(phrases_data) - 1:
+                                st.session_state["current_phrase_idx"] += 1
+                                st.rerun()
 
-                    stopAudio();
-                    const item = deck[currentIndex];
-                    if (!item.audio) return;
+            st.divider()
+            
+            col_p1, col_p2, col_p3 = st.columns([2, 2, 2])
+            with col_p1:
+                if st.button("▶️ Start / Restart", type="primary", use_container_width=True, key="start_drill_btn"):
+                    st.session_state["drill_active"] = True
+                    st.session_state["drill_paused"] = False
+                    st.session_state["current_phrase_idx"] = 0
+                    st.rerun()
+                    
+            with col_p2:
+                pause_label = "▶️ Resume" if st.session_state["drill_paused"] else "⏸️ Pause"
+                if st.button(pause_label, use_container_width=True, key="pause_drill_btn", disabled=not st.session_state["drill_active"]):
+                    st.session_state["drill_paused"] = not st.session_state["drill_paused"]
+                    st.rerun()
+                    
+            with col_p3:
+                if st.button("⏹️ Stop", type="secondary", use_container_width=True, key="stop_drill_btn", disabled=not st.session_state["drill_active"]):
+                    st.session_state["drill_active"] = False
+                    st.session_state["drill_paused"] = False
+                    st.session_state["current_phrase_idx"] = 0
+                    st.rerun()
 
-                    currentAudio = new Audio(item.audio);
-                    currentAudio.playbackRate = parseFloat(speedSlider.value);
+            # --- DRILL AUTO-ADVANCE & REPS/PAUSE EXECUTION LOOP ---
+            if st.session_state["drill_active"] and not st.session_state["drill_paused"] and phrases_data:
+                curr_idx = st.session_state["current_phrase_idx"]
+                if curr_idx < len(phrases_data):
+                    p = phrases_data[curr_idx]
+                    target = p.get("spanish", "")
+                    
+                    audio_bytes = get_audio_bytes(target, rate_str=selected_rate)
+                    if audio_bytes:
+                        for rep in range(repetitions):
+                            play_audio_silently(audio_bytes)
+                            time.sleep(pause_duration)
+                    
+                    if st.session_state["current_phrase_idx"] < len(phrases_data) - 1:
+                        st.session_state["current_phrase_idx"] += 1
+                        st.rerun()
+                    else:
+                        st.session_state["drill_active"] = False
+                        st.success("🎉 Drill completed!")
+                        st.rerun()
 
-                    currentAudio.onended = () => {{
-                        currentRepeat++;
-                        const totalRepeats = parseInt(repeatSlider.value);
-                        const pauseGapMs = parseFloat(pauseSlider.value) * 1000;
+            st.divider()
+            
+            with st.expander(f"📋 Click to view Phrase List and play Individual Phrases ({len(phrases_data)} items)"):
+                for idx, p in enumerate(phrases_data, 1):
+                    target = p.get("spanish", "")
+                    translation = p.get("english", "")
+                    
+                    row_cols = st.columns([4, 1])
+                    with row_cols[0]:
+                        if reverse_recall:
+                            display_str = f"**{idx}.** {translation} &nbsp;|&nbsp; *(Think Spanish)*"
+                        elif show_translation:
+                            display_str = f"**{idx}.** {target} &nbsp;|&nbsp; *{translation}*"
+                        else:
+                            display_str = f"**{idx}.** {target}"
+                        st.markdown(display_str)
+                    with row_cols[1]:
+                        if st.button("▶", key=f"play_single_{idx}"):
+                            audio_data = get_audio_bytes(target, rate_str=selected_rate)
+                            if audio_data:
+                                play_audio_silently(audio_data)
 
-                        if (currentRepeat < totalRepeats) {{
-                            timerId = setTimeout(playSentence, pauseGapMs);
-                        }} else {{
-                            if (currentIndex < deck.length - 1) {{
-                                timerId = setTimeout(() => {{
-                                    currentIndex++;
-                                    currentRepeat = 0;
-                                    updateCard();
-                                    playSentence();
-                                }}, pauseGapMs);
-                            }} else {{
-                                timerId = setTimeout(() => {{
-                                    stopDrill();
-                                }}, pauseGapMs);
-                            }}
-                        }}
-                    }};
-
-                    currentAudio.play();
-                }}
-
-                function stopAudio() {{
-                    if (timerId) clearTimeout(timerId);
-                    if (currentAudio) {{
-                        currentAudio.pause();
-                        currentAudio = null;
-                    }}
-                }}
-
-                function stopDrill() {{
-                    isPlaying = false;
-                    stopAudio();
-                    playPauseBtn.innerText = '▶️ Play Drill';
-                }}
-
-                function startDrill() {{
-                    isPlaying = true;
-                    currentRepeat = 0;
-                    playPauseBtn.innerText = '⏸️ Pause';
-                    playSentence();
-                }}
-
-                playPauseBtn.addEventListener('click', () => {{
-                    if (isPlaying) {{
-                        stopDrill();
-                    }} else {{
-                        startDrill();
-                    }}
-                }});
-
-                prevBtn.addEventListener('click', () => {{
-                    if (currentIndex > 0) {{
-                        stopAudio();
-                        currentIndex--;
-                        currentRepeat = 0;
-                        updateCard();
-                  
+# ==========================================
+# TAB 2: UPLOAD CSV / TSV FILE
+# ==========================================
+with tab_upload:
+    st.markdown("### Upload Bilingual Phrase File")
+    
+    uploaded_file = st.file_uploader("Choose a premade .CSV, .TSV, or .TXT file from your device. ( 2 columns: target language 1st, translation 2nd. Separated by pipe ( | ), comma, or tab", type=["csv", "tsv", "txt"], key="upload_file_widget")
+    deck_title_input = st.text_input("Enter a Name for your New Deck", placeholder="Imported Deck", key="upload_deck_title")
+    
+    if uploaded_file is not None:
+        try:
+            content = uploaded_file.getvalue().decode("utf-8", errors="ignore")
+            first_lines = "\n".join(content.splitlines()[:5])
+            
+            sep = ","
+            if ";" in first_lines and first_lines.count(";") >= first_lines.count(","):
+                sep = ";"
+            elif "\t" in first_lines:
+                sep = "\t"
+            elif "|" in first_lines:
+                sep = "|"
+            
+            import io
+            df = pd.read_csv(io.StringIO(content), sep=sep)
+            
+            if len(df.columns) == 1:
+                for alt_sep in [",", ";", "\t", "|"]:
+                    df_test = pd.read_csv(io.StringIO(content), sep=alt_sep)
+                    if len(df_test.columns) > 1:
+                        df = df_test
+                        sep = alt_sep
+                        break
+            
+            st.write(f"File preview (Detected separator: `{repr(sep)}`):")
+            st.dataframe(df.head(3), height=150)
+            
+            if st.button("Save Deck to Supabase", type="primary"):
+                if not deck_title_input.strip():
+                    st.warning("Please enter a valid Deck Name.")
+                else:
+                    with st.spinner("Saving..."):
+                        supabase.table("decks").upsert({"name": deck_title_input.strip()}).execute()
+                        cols = {str(c).lower().strip(): c for c in df.columns}
+                        
+                        col_es = cols.get('spanish', cols.get('es', df.columns[0] if len(df.columns) > 0 else None))
+                        col_en = cols.get('english', cols.get('en', df.columns[1] if len(df.columns) > 1 else col_es))
+                        
+ 
