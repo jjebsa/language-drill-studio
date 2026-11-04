@@ -157,12 +157,12 @@ with tab_practice:
                 <a href="https://www.youtube.com/watch?v={video_id}" target="_blank">
                     <img src="{thumbnail_url}" width="120" style="border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.2);">
                 </a>
-                <p style="font-size: 0.85em; color: white; margin-top: 6px;">▶ Tap on image to watch tutorial on YouTube</p>
+                <p style="font-size: 0.85em; color: white; margin-top: 6px;">▶ Tap on image to watch: What is Active Recall?</p>
             </div>
             """
             st.markdown(html_content, unsafe_allow_html=True)
         with top_col2:
-            st.caption("#### Select a Deck to Practice ↴")
+            st.markdown("##### Select a Deck to Practice ↴")
             selected_deck = st.selectbox("Select Deck:", deck_names, key="active_deck_select", label_visibility="collapsed")
 
         if selected_deck:
@@ -393,7 +393,7 @@ with tab_upload:
         st.session_state["upload_deck_title"] = ""
         st.session_state["clear_upload_form"] = False
 
-    st.markdown("### Upload Bilingual Phrase File")
+    st.markdown("### 📁 Upload Bilingual Phrase File")
     
     uploaded_file = st.file_uploader("Choose a premade .CSV, .TSV, or .TXT file from your device. (2 columns: target language 1st, translation 2nd. Separated by pipe (|), comma, or tab)", type=["csv", "tsv", "txt"], key="upload_file_widget")
     deck_title_input = st.text_input("Enter a Name for your New Deck", placeholder="Imported Deck", key="upload_deck_title")
@@ -465,9 +465,9 @@ with tab_paste:
        st.session_state["paste_deck_title"] = ""
        st.session_state["clear_paste_form"] = False
 
-    st.markdown("### Type or Paste Words and Phrases")
+    st.markdown("### ✍️ Type or Paste Words and Phrases")
     st.markdown("You can enter multiple pairs here. Be sure to use the separation symbols between your target language and its translation, either pipe (`|`) or comma.") 
-
+    st.caption("*Optionally, enter one pair, then **SAVE DECK**, then add more lines under **EDIT DECK** in the **PRACTICE STUDIO**. May be easier if typing rather than pasting.*")
     raw_text = st.text_area(
         "Enter your Phrase or Word Pairs", 
         placeholder="Hola | Hello\n¿Cómo estás? , How are you?", 
