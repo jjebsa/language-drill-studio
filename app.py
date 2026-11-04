@@ -408,7 +408,7 @@ with tab_upload:
                 sep = "|"
             
             import io
-            df = pd.read_csv(io.StringIO(content), sep=sep)
+            df = pd.read_csv(io.StringIO(content), sep=sep, header=None)
             
             if len(df.columns) == 1:
                 for alt_sep in [",", ";", "\t", "|"]:
