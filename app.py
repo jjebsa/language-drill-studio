@@ -389,7 +389,13 @@ with tab_practice:
 # TAB 2: UPLOAD CSV / TSV FILE
 # ==========================================
 with tab_upload:
-    st.markdown("### 📁 Upload Bilingual Phrase File")
+    # --- RESET CHECK (Must be before widgets are created) ---
+    if st.session_state.get("clear_upload_form", False):
+        st.session_state["upload_deck_title"] = ""
+        st.session_state["clear_upload_form"] = False
+    # --------------------------------------------------------
+
+    st.markdown("### Upload Bilingual Phrase File")
     
     uploaded_file = st.file_uploader("Choose a premade .CSV, .TSV, or .TXT file from your device. ( 2 columns: target language 1st, translation 2nd. Separated by pipe ( | ), comma, or tab", type=["csv", "tsv", "txt"], key="upload_file_widget")
     deck_title_input = st.text_input("Enter a Name for your New Deck", placeholder="Imported Deck", key="upload_deck_title")
@@ -408,11 +414,12 @@ with tab_upload:
                 sep = "|"
             
             import io
+            # Added header=None so pandas doesn't accidentally skip your first row of phrases
             df = pd.read_csv(io.StringIO(content), sep=sep, header=None)
             
             if len(df.columns) == 1:
                 for alt_sep in [",", ";", "\t", "|"]:
-                    df_test = pd.read_csv(io.StringIO(content), sep=alt_sep)
+                    df_test = pd.read_csv(io.StringIO(content), sep=alt_sep, header=None)
                     if len(df_test.columns) > 1:
                         df = df_test
                         sep = alt_sep
@@ -429,13 +436,13 @@ with tab_upload:
                         supabase.table("decks").upsert({"name": deck_title_input.strip()}).execute()
                         cols = {str(c).lower().strip(): c for c in df.columns}
                         
-                        col_es = cols.get('spanish', cols.get('es', df.columns[0] if len(df.columns) > 0 else None))
-                        col_en = cols.get('english', cols.get('en', df.columns[1] if len(df.columns) > 1 else col_es))
+                        col_es = cols.get('spanish', cols.get('es', 0))
+                        col_en = cols.get('english', cols.get('en', 1 if len(df.columns) > 1 else 0))
                         
                         success_count = 0
                         for _, row in df.iterrows():
-                            spanish_val = str(row[col_es]).strip() if col_es and pd.notna(row[col_es]) else ""
-                            english_val = str(row[col_en]).strip() if col_en and pd.notna(row[col_en]) else ""
+                            spanish_val = str(row[col_es]).strip() if pd.notna(row[col_es]) else ""
+                            english_val = str(row[col_en]).strip() if pd.notna(row[col_en]) else ""
                             if spanish_val and spanish_val != "nan":
                                 supabase.table("phrases").insert({
                                     "deck_name": deck_title_input.strip(),
@@ -446,7 +453,8 @@ with tab_upload:
                         
                         st.success(f"Saved '{deck_title_input}' ({success_count} phrases)!")
                         
-                        st.session_state["upload_deck_title"] = ""
+                        # Trigger the flag instead of modifying the widget state directly
+                        st.session_state["clear_upload_form"] = True
                         time.sleep(0.8)
                         st.rerun()
         except Exception as e:
