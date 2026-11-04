@@ -157,7 +157,7 @@ with tab_practice:
                 <a href="https://www.youtube.com/watch?v={video_id}" target="_blank">
                     <img src="{thumbnail_url}" width="120" style="border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.2);">
                 </a>
-                <p style="font-size: 0.85em; color: white; margin-top: 6px;">▶ Tap on image to watch tutorial on YouTube</p>
+                <p style="font-size: 0.85em; color: white; margin-top: 6px;">▶ Tap on image to watch "What is Active Recall" on YouTube</p>
             </div>
             """
             st.markdown(html_content, unsafe_allow_html=True)
